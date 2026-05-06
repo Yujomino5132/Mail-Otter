@@ -42,7 +42,7 @@ function checkIndexExists(indexName: string): boolean {
 
 function createIndex(indexName: string, dimensions: number): void {
   console.log(`Creating Vectorize index: ${indexName} with ${dimensions} dimensions`);
-  exec(`npx wrangler vectorize create ${indexName} --dimensions=${dimensions}`);
+  exec(`npx wrangler vectorize create ${indexName} --dimensions=${dimensions} --metric=cosine`);
 }
 
 async function main() {
