@@ -33,7 +33,7 @@ function parseWranglerConfig(): WranglerConfig {
 
 function checkIndexExists(indexName: string): boolean {
   try {
-    exec(`npx wrangler vectorize info ${indexName} --remote`);
+    exec(`npx wrangler vectorize info ${indexName}`);
     return true;
   } catch {
     return false;
@@ -42,7 +42,7 @@ function checkIndexExists(indexName: string): boolean {
 
 function createIndex(indexName: string, dimensions: number): void {
   console.log(`Creating Vectorize index: ${indexName} with ${dimensions} dimensions`);
-  exec(`npx wrangler vectorize create ${indexName} --dimensions=${dimensions} --remote`);
+  exec(`npx wrangler vectorize create ${indexName} --dimensions=${dimensions}`);
 }
 
 async function main() {
