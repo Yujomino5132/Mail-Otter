@@ -40,22 +40,9 @@ abstract class AbstractEntrypointWorker {
     }
   }
 
-  public async queue(batch: MessageBatch<unknown>, env: Env, ctx: ExecutionContext): Promise<void> {
-    this.printExecId();
-    console.log('Worker triggered by Queue batch');
-    try {
-      await this.onQueue(batch, env, ctx);
-    } catch (err: unknown) {
-      console.error('Unhandled error in queue():', err);
-      throw err;
-    }
-  }
-
   protected abstract onRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response>;
 
   protected abstract onScheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void>;
-
-  protected async onQueue(_batch: MessageBatch<unknown>, _env: Env, _ctx: ExecutionContext): Promise<void> {}
 }
 
 export { AbstractEntrypointWorker };

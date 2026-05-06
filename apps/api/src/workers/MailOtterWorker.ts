@@ -17,8 +17,7 @@ import {
 } from '@/endpoints';
 import { MiddlewareHandlers } from '@/middleware';
 import { SPA_HTML } from '@/generated/spa-shell';
-import { EmailProcessingUtil, SubscriptionRenewalUtil } from '@/utils';
-import type { EmailQueueMessage } from '@mail-otter/shared/model';
+import { SubscriptionRenewalUtil } from '@/utils';
 
 class MailOtterWorker extends AbstractEntrypointWorker {
   protected readonly app: HonoOpenAPIRouterType<{
@@ -90,18 +89,6 @@ class MailOtterWorker extends AbstractEntrypointWorker {
 
   protected async onScheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
     await SubscriptionRenewalUtil.renewDueSubscriptions(env, env.PUBLIC_BASE_URL);
-  }
-
-  protected async onQueue(batch: MessageBatch<unknown>, env: Env, _ctx: ExecutionContext): Promise<void> {
-    for (const message of batch.messages) {
-      try {
-        await EmailProcessingUtil.processQueueMessage(message.body as EmailQueueMessage, env);
-        message.ack();
-      } catch (error: unknown) {
-        console.error('Failed to process email event queue message:', error);
-        message.retry();
-      }
-    }
   }
 }
 
