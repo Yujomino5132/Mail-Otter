@@ -49,7 +49,7 @@ describe('OutlookProviderUtil', () => {
         ccRecipients: [],
         bccRecipients: [],
       });
-      expect(patchBody.internetMessageHeaders).toEqual([{ name: 'X-Mail-Otter-Summary', value: 'true' }]);
+      expect(patchBody.internetMessageHeaders).toBeUndefined();
       expect(fetchMock).toHaveBeenNthCalledWith(
         3,
         'https://graph.microsoft.com/v1.0/me/messages/draft-id-123/send',

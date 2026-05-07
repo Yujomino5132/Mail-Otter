@@ -155,7 +155,6 @@ class OutlookProviderUtil {
           toRecipients: [{ emailAddress: { address: mailboxAddress } }],
           ccRecipients: [],
           bccRecipients: [],
-          internetMessageHeaders: [{ name: 'X-Mail-Otter-Summary', value: 'true' }],
         }),
       },
     );
