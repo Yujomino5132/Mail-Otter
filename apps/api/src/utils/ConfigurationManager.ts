@@ -28,7 +28,11 @@ class ConfigurationManager {
   }
 
   public static getOutlookSubscriptionRenewalWindowHours(env: unknown): number {
-    return ConfigurationManager.getPositiveInt(env, 'OUTLOOK_SUBSCRIPTION_RENEWAL_WINDOW_HOURS', DEFAULT_OUTLOOK_SUBSCRIPTION_RENEWAL_WINDOW_HOURS);
+    return ConfigurationManager.getPositiveInt(
+      env,
+      'OUTLOOK_SUBSCRIPTION_RENEWAL_WINDOW_HOURS',
+      DEFAULT_OUTLOOK_SUBSCRIPTION_RENEWAL_WINDOW_HOURS,
+    );
   }
 
   public static getOutlookSubscriptionTtlDays(env: unknown): number {

@@ -1,8 +1,4 @@
-import {
-  CONNECTED_APPLICATION_STATUS_CONNECTED,
-  PROVIDER_GOOGLE_GMAIL,
-  PROVIDER_MICROSOFT_OUTLOOK,
-} from '@mail-otter/shared/constants';
+import { CONNECTED_APPLICATION_STATUS_CONNECTED, PROVIDER_GOOGLE_GMAIL, PROVIDER_MICROSOFT_OUTLOOK } from '@mail-otter/shared/constants';
 import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '@/dao';
 import { BadRequestError } from '@/error';
 import { IUserRoute } from '@/endpoints/IUserRoute';
