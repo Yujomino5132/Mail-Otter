@@ -1,29 +1,14 @@
-import {
-  DEFAULT_GMAIL_WATCH_RENEWAL_WINDOW_HOURS,
-  DEFAULT_OUTLOOK_SUBSCRIPTION_RENEWAL_WINDOW_HOURS,
-  DEFAULT_OUTLOOK_SUBSCRIPTION_TTL_DAYS,
-  PROVIDER_GOOGLE_GMAIL,
-  PROVIDER_MICROSOFT_OUTLOOK,
-} from '@mail-otter/shared/constants';
+import { PROVIDER_GOOGLE_GMAIL, PROVIDER_MICROSOFT_OUTLOOK } from '@mail-otter/shared/constants';
 import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '@/dao';
 import type { ConnectedApplication, OAuth2Credentials, ProviderSubscription } from '@mail-otter/shared/model';
-import { ConfigurationUtil, TimestampUtil } from '@mail-otter/shared/utils';
-import { GmailProviderUtil } from './GmailProviderUtil';
-import { OAuth2ProviderUtil } from './OAuth2ProviderUtil';
-import { OutlookProviderUtil } from './OutlookProviderUtil';
-import { WebhookSecurityUtil } from './WebhookSecurityUtil';
+import { TimestampUtil } from '@mail-otter/shared/utils';
+import { ConfigurationManager, GmailProviderUtil, OAuth2ProviderUtil, OutlookProviderUtil, WebhookSecurityUtil } from '@/utils';
 
 class SubscriptionRenewalUtil {
   public static async renewDueSubscriptions(env: SubscriptionRenewalEnv): Promise<void> {
     const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
-    const gmailWindowHours: number = ConfigurationUtil.getPositiveInteger(
-      env.GMAIL_WATCH_RENEWAL_WINDOW_HOURS,
-      DEFAULT_GMAIL_WATCH_RENEWAL_WINDOW_HOURS,
-    );
-    const outlookWindowHours: number = ConfigurationUtil.getPositiveInteger(
-      env.OUTLOOK_SUBSCRIPTION_RENEWAL_WINDOW_HOURS,
-      DEFAULT_OUTLOOK_SUBSCRIPTION_RENEWAL_WINDOW_HOURS,
-    );
+    const gmailWindowHours: number = ConfigurationManager.getGmailWatchRenewalWindowHours(env);
+    const outlookWindowHours: number = ConfigurationManager.getOutlookSubscriptionRenewalWindowHours(env);
     const maxWindowSeconds: number = Math.max(gmailWindowHours, outlookWindowHours) * 60 * 60;
     const subscriptionDAO = new ProviderSubscriptionDAO(env.DB);
     const masterKey: string = await env.AES_ENCRYPTION_KEY_SECRET.get();
@@ -72,7 +57,7 @@ class SubscriptionRenewalUtil {
     const application: ConnectedApplication | undefined = await applicationDAO.getById(subscription.applicationId);
     if (!application || !subscription.externalSubscriptionId) return;
     const accessToken: string = await SubscriptionRenewalUtil.refresh(application, applicationDAO);
-    const ttlDays: number = ConfigurationUtil.getPositiveInteger(env.OUTLOOK_SUBSCRIPTION_TTL_DAYS, DEFAULT_OUTLOOK_SUBSCRIPTION_TTL_DAYS);
+    const ttlDays: number = ConfigurationManager.getOutlookSubscriptionTtlDays(env);
     const expiresAt: number = TimestampUtil.addDays(TimestampUtil.getCurrentUnixTimestampInSeconds(), ttlDays);
     const renewed = await OutlookProviderUtil.renewSubscription(accessToken, subscription.externalSubscriptionId, expiresAt);
     await subscriptionDAO.upsertActive({

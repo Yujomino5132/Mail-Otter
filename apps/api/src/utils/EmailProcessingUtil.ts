@@ -1,18 +1,16 @@
-import {
-  DEFAULT_EMAIL_SUMMARY_MODEL,
-  DEFAULT_MAX_EMAIL_BODY_CHARS,
-  PROVIDER_SUBSCRIPTION_STATUS_ACTIVE,
-} from '@mail-otter/shared/constants';
+import { PROVIDER_SUBSCRIPTION_STATUS_ACTIVE } from '@mail-otter/shared/constants';
 import { ConnectedApplicationDAO, ProcessedMessageDAO, ProviderSubscriptionDAO } from '@/dao';
 import type { ConnectedApplication, EmailQueueMessage, OAuth2Credentials, ProviderSubscription } from '@mail-otter/shared/model';
 import { BadRequestError } from '@/error';
-import { ConfigurationUtil } from '@mail-otter/shared/utils';
-import { EmailContentUtil } from './EmailContentUtil';
-import { EmailContextUtil } from './EmailContextUtil';
-import { EmailSummaryUtil } from './EmailSummaryUtil';
-import { GmailProviderUtil } from './GmailProviderUtil';
-import { OAuth2ProviderUtil } from './OAuth2ProviderUtil';
-import { OutlookProviderUtil } from './OutlookProviderUtil';
+import {
+  ConfigurationManager,
+  EmailContentUtil,
+  EmailContextUtil,
+  EmailSummaryUtil,
+  GmailProviderUtil,
+  OAuth2ProviderUtil,
+  OutlookProviderUtil,
+} from '@/utils';
 import type { GmailMessage } from './GmailProviderUtil';
 import type { OutlookMessage } from './OutlookProviderUtil';
 
@@ -184,9 +182,9 @@ class EmailProcessingUtil {
     body: string,
     ragContext?: string | undefined,
   ): Promise<string> {
-    const maxChars: number = ConfigurationUtil.getPositiveInteger(env.MAX_EMAIL_BODY_CHARS, DEFAULT_MAX_EMAIL_BODY_CHARS);
+    const maxChars: number = ConfigurationManager.getMaxEmailBodyChars(env);
     const input: string = EmailContentUtil.truncate(body || '(empty message body)', maxChars);
-    return EmailSummaryUtil.summarizeEmail(env.AI, env.AI_SUMMARY_MODEL || DEFAULT_EMAIL_SUMMARY_MODEL, subject, from, input, ragContext);
+    return EmailSummaryUtil.summarizeEmail(env.AI, ConfigurationManager.getEmailSummaryModel(env), subject, from, input, ragContext);
   }
 
   private static formatError(error: unknown): string {

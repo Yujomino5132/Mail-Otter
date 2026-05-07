@@ -1,9 +1,4 @@
-import {
-  CONNECTED_APPLICATION_STATUS_CONNECTED,
-  DEFAULT_OUTLOOK_SUBSCRIPTION_TTL_DAYS,
-  PROVIDER_GOOGLE_GMAIL,
-  PROVIDER_MICROSOFT_OUTLOOK,
-} from '@mail-otter/shared/constants';
+import { CONNECTED_APPLICATION_STATUS_CONNECTED, PROVIDER_GOOGLE_GMAIL, PROVIDER_MICROSOFT_OUTLOOK } from '@mail-otter/shared/constants';
 import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '@/dao';
 import { BadRequestError } from '@/error';
 import { IUserRoute } from '@/endpoints/IUserRoute';
@@ -11,7 +6,7 @@ import type { IUserEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IU
 import type { ConnectedApplication, OAuth2Credentials, ProviderSubscription } from '@mail-otter/shared/model';
 import {
   BaseUrlUtil,
-  ConfigurationUtil,
+  ConfigurationManager,
   GmailProviderUtil,
   OAuth2ProviderUtil,
   OutlookProviderUtil,
@@ -104,7 +99,7 @@ class StartApplicationWatchRoute extends IUserRoute<StartApplicationWatchRequest
     subscriptionDAO: ProviderSubscriptionDAO,
   ): Promise<StartApplicationWatchResponse> {
     const clientState: string = WebhookSecurityUtil.generateSecret().slice(0, 128);
-    const ttlDays: number = ConfigurationUtil.getPositiveInteger(env.OUTLOOK_SUBSCRIPTION_TTL_DAYS, DEFAULT_OUTLOOK_SUBSCRIPTION_TTL_DAYS);
+    const ttlDays: number = ConfigurationManager.getOutlookSubscriptionTtlDays(env);
     const expiresAt: number = TimestampUtil.addDays(TimestampUtil.getCurrentUnixTimestampInSeconds(), ttlDays);
     const notificationUrl: string = `${baseUrl}/api/webhooks/outlook/${application.applicationId}`;
     const lifecycleNotificationUrl: string = `${baseUrl}/api/webhooks/outlook/lifecycle/${application.applicationId}`;

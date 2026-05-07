@@ -1,6 +1,7 @@
 export * from '@mail-otter/shared/utils';
 
 export * from './ApplicationResponseUtil';
+export * from './ConfigurationManager';
 export * from './EmailContextUtil';
 export * from './EmailContentUtil';
 export * from './EmailProcessingUtil';

@@ -1,7 +1,6 @@
 import { IUserRoute } from '@/endpoints/IUserRoute';
 import type { IUserEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IUserRoute';
-import { DEFAULT_MAX_APPLICATIONS_PER_USER } from '@mail-otter/shared/constants';
-import { ConfigurationUtil } from '@/utils';
+import { ConfigurationManager } from '@/utils';
 
 class GetCurrentUserRoute extends IUserRoute<GetCurrentUserRequest, GetCurrentUserResponse, GetCurrentUserEnv> {
   schema = {
@@ -22,7 +21,7 @@ class GetCurrentUserRoute extends IUserRoute<GetCurrentUserRequest, GetCurrentUs
     return {
       email: this.getAuthenticatedUserEmailAddress(cxt),
       limits: {
-        maxApplicationsPerUser: ConfigurationUtil.getPositiveInteger(env.MAX_APPLICATIONS_PER_USER, DEFAULT_MAX_APPLICATIONS_PER_USER),
+        maxApplicationsPerUser: ConfigurationManager.getMaxApplicationsPerUser(env),
       },
     };
   }
