@@ -22,7 +22,7 @@ import {
 } from '@/endpoints';
 import { MiddlewareHandlers } from '@/middleware';
 import { SPA_HTML } from '@/generated/spa-shell';
-import { SubscriptionRenewalUtil } from '@/utils';
+import { ConfigurationManager, SubscriptionRenewalUtil } from '@/utils';
 
 class MailOtterWorker extends AbstractEntrypointWorker {
   protected readonly app: HonoOpenAPIRouterType<{
@@ -86,7 +86,14 @@ class MailOtterWorker extends AbstractEntrypointWorker {
     openapi.get('/api/webhooks/outlook/lifecycle/:applicationId', OutlookLifecycleWebhookRoute);
     openapi.post('/api/webhooks/outlook/lifecycle/:applicationId', OutlookLifecycleWebhookRoute);
 
-    app.get('/user/*', (c) => {
+    app.get('*', (c) => {
+      const path: string = new URL(c.req.url).pathname;
+      if (!path.startsWith('/user/')) {
+        return c.notFound();
+      }
+      if (!ConfigurationManager.getServeSpaFromWorker(c.env)) {
+        return c.notFound();
+      }
       return c.html(SPA_HTML);
     });
 

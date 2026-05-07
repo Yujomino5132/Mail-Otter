@@ -1,10 +1,10 @@
-import { CONNECTION_METHOD_OAUTH2, DEFAULT_OAUTH2_STATE_EXPIRY_MINUTES } from '@mail-otter/shared/constants';
+import { CONNECTION_METHOD_OAUTH2 } from '@mail-otter/shared/constants';
 import { ConnectedApplicationDAO, OAuth2AuthorizationSessionDAO } from '@/dao';
 import { BadRequestError } from '@/error';
 import { IUserRoute } from '@/endpoints/IUserRoute';
 import type { IUserEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IUserRoute';
 import type { ConnectedApplication, OAuth2Credentials } from '@mail-otter/shared/model';
-import { BaseUrlUtil, ConfigurationUtil, OAuth2ProviderUtil, OAuth2StateUtil, TimestampUtil } from '@/utils';
+import { BaseUrlUtil, ConfigurationManager, OAuth2ProviderUtil, OAuth2StateUtil, TimestampUtil } from '@/utils';
 
 class CreateOAuth2AuthorizationRoute extends IUserRoute<
   CreateOAuth2AuthorizationRequest,
@@ -45,10 +45,7 @@ class CreateOAuth2AuthorizationRoute extends IUserRoute<
     const codeChallenge: string = await OAuth2StateUtil.getCodeChallenge(codeVerifier);
     const redirectUri: string = `${BaseUrlUtil.getBaseUrl(request.raw)}/api/oauth2/callback/${application.applicationId}`;
     const stateHash: string = await OAuth2StateUtil.getStateHash(state);
-    const expiryMinutes: number = ConfigurationUtil.getPositiveInteger(
-      env.OAUTH2_STATE_EXPIRY_MINUTES,
-      DEFAULT_OAUTH2_STATE_EXPIRY_MINUTES,
-    );
+    const expiryMinutes: number = ConfigurationManager.getOauth2StateExpiryMinutes(env);
     const expiresAt: number = TimestampUtil.addMinutes(TimestampUtil.getCurrentUnixTimestampInSeconds(), expiryMinutes);
     const sessionDAO: OAuth2AuthorizationSessionDAO = new OAuth2AuthorizationSessionDAO(env.DB);
     await sessionDAO.create(application.applicationId, stateHash, codeVerifier, redirectUri, expiresAt);

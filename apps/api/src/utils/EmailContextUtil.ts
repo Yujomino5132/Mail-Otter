@@ -1,14 +1,7 @@
-import {
-  DEFAULT_AI_EMBEDDING_MODEL,
-  DEFAULT_MAX_CONTEXT_MEMORY_CHARS,
-  DEFAULT_MAX_RAG_CONTEXT_CHARS,
-  DEFAULT_RAG_TOP_K,
-  DEFAULT_RAG_VECTOR_QUERY_TOP_K,
-} from '@mail-otter/shared/constants';
 import { ApplicationContextDAO } from '@/dao';
 import type { ApplicationContextDocument, ConnectedApplication } from '@mail-otter/shared/model';
-import { ConfigurationUtil, CryptoUtil } from '@mail-otter/shared/utils';
-import { EmailContentUtil } from './EmailContentUtil';
+import { CryptoUtil } from '@mail-otter/shared/utils';
+import { ConfigurationManager, EmailContentUtil } from '@/utils';
 
 class EmailContextUtil {
   public static async getUserVectorNamespace(userEmail: string): Promise<string> {
@@ -44,7 +37,7 @@ class EmailContextUtil {
     try {
       const embedding: number[] = await EmailContextUtil.embed(
         input.env.AI,
-        input.env.AI_EMBEDDING_MODEL || DEFAULT_AI_EMBEDDING_MODEL,
+        ConfigurationManager.getAiEmbeddingModel(input.env),
         indexedText,
       );
       const ragContext: string | undefined = shouldRetrieve
@@ -90,7 +83,7 @@ class EmailContextUtil {
   }
 
   private static buildIndexedText(input: PrepareEmailRagContextInput): string {
-    const maxChars: number = ConfigurationUtil.getPositiveInteger(input.env.MAX_CONTEXT_MEMORY_CHARS, DEFAULT_MAX_CONTEXT_MEMORY_CHARS);
+    const maxChars: number = ConfigurationManager.getMaxContextMemoryChars(input.env);
     const text: string = [
       `Subject: ${input.subject || '(no subject)'}`,
       `From: ${input.from || '(unknown)'}`,
@@ -136,9 +129,9 @@ class EmailContextUtil {
     excludedVectorId: string | undefined,
   ): Promise<string | undefined> {
     if (!env.EMAIL_CONTEXT_INDEX) return undefined;
-    const queryTopK: number = ConfigurationUtil.getPositiveInteger(env.RAG_VECTOR_QUERY_TOP_K, DEFAULT_RAG_VECTOR_QUERY_TOP_K);
-    const ragTopK: number = ConfigurationUtil.getPositiveInteger(env.RAG_TOP_K, DEFAULT_RAG_TOP_K);
-    const maxContextChars: number = ConfigurationUtil.getPositiveInteger(env.MAX_RAG_CONTEXT_CHARS, DEFAULT_MAX_RAG_CONTEXT_CHARS);
+    const queryTopK: number = ConfigurationManager.getRagVectorQueryTopK(env);
+    const ragTopK: number = ConfigurationManager.getRagTopK(env);
+    const maxContextChars: number = ConfigurationManager.getMaxRagContextChars(env);
     const matches: VectorizeMatches = await env.EMAIL_CONTEXT_INDEX.query(embedding, {
       namespace: vectorNamespace,
       topK: queryTopK,
