@@ -11,7 +11,7 @@ describe('OutlookProviderUtil', () => {
       const mockCreateReplyResponse = new Response(JSON.stringify({ id: 'draft-id-123' }), { status: 200 });
       const mockPatchResponse = new Response('', { status: 200 });
       const mockSendResponse = new Response('', { status: 202 });
-      const mockDeleteResponse = new Response('', { status: 204 });
+      const mockDeleteResponse = new Response(null, { status: 204 });
 
       const fetchMock = vi.fn()
         .mockResolvedValueOnce(mockCreateReplyResponse)
