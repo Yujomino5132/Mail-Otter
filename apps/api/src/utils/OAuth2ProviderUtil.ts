@@ -27,6 +27,7 @@ interface OAuth2RefreshInput {
 interface OAuth2TokenResult {
   accessToken: string;
   refreshToken?: string | undefined;
+  expiresIn?: number | undefined;
 }
 
 const ProviderConfig = {
@@ -79,6 +80,7 @@ class OAuth2ProviderUtil {
     return {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
+      expiresIn: OAuth2ProviderUtil.parseExpiresIn(data.expires_in),
     };
   }
 
@@ -96,7 +98,12 @@ class OAuth2ProviderUtil {
     return {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
+      expiresIn: OAuth2ProviderUtil.parseExpiresIn(data.expires_in),
     };
+  }
+
+  public static getExpiresInSeconds(tokenResult: OAuth2TokenResult, fallbackTtlSeconds: number): number {
+    return tokenResult.expiresIn && tokenResult.expiresIn > 0 ? tokenResult.expiresIn : fallbackTtlSeconds;
   }
 
   private static getProviderConfig(providerId: string) {
@@ -120,11 +127,21 @@ class OAuth2ProviderUtil {
     }
     return data;
   }
+
+  private static parseExpiresIn(expiresIn: number | string | undefined): number | undefined {
+    if (typeof expiresIn === 'number') return Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : undefined;
+    if (typeof expiresIn === 'string') {
+      const parsed: number = Number(expiresIn);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+    }
+    return undefined;
+  }
 }
 
 interface OAuth2TokenResponse {
   access_token: string;
   refresh_token?: string | undefined;
+  expires_in?: number | string | undefined;
   error?: string | undefined;
   error_description?: string | undefined;
 }

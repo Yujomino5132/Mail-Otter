@@ -3,12 +3,12 @@ import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '@/dao';
 import { BadRequestError } from '@/error';
 import { IUserRoute } from '@/endpoints/IUserRoute';
 import type { IUserEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IUserRoute';
-import type { ConnectedApplication, OAuth2Credentials, ProviderSubscription } from '@mail-otter/shared/model';
+import type { ConnectedApplication, ProviderSubscription } from '@mail-otter/shared/model';
 import {
   BaseUrlUtil,
   ConfigurationManager,
   GmailProviderUtil,
-  OAuth2ProviderUtil,
+  OAuth2AccessTokenService,
   OutlookProviderUtil,
   TimestampUtil,
   WebhookSecurityUtil,
@@ -44,21 +44,15 @@ class StartApplicationWatchRoute extends IUserRoute<StartApplicationWatchRequest
       throw new BadRequestError('Connected application is missing provider mailbox metadata.');
     }
 
-    const tokenResult = await OAuth2ProviderUtil.refreshAccessToken({
-      providerId: application.providerId,
-      credentials: application.credentials as OAuth2Credentials,
-    });
-    if (tokenResult.refreshToken) {
-      await applicationDAO.updateOAuth2RefreshToken(application.applicationId, tokenResult.refreshToken);
-    }
+    const accessToken: string = await OAuth2AccessTokenService.getAccessToken(application.applicationId, env);
 
     const baseUrl: string = BaseUrlUtil.getBaseUrl(request.raw);
     const subscriptionDAO = new ProviderSubscriptionDAO(env.DB);
     if (application.providerId === PROVIDER_GOOGLE_GMAIL) {
-      return this.startGmailWatch(application, tokenResult.accessToken, baseUrl, subscriptionDAO);
+      return this.startGmailWatch(application, accessToken, baseUrl, subscriptionDAO);
     }
     if (application.providerId === PROVIDER_MICROSOFT_OUTLOOK) {
-      return this.startOutlookWatch(application, tokenResult.accessToken, baseUrl, env, subscriptionDAO);
+      return this.startOutlookWatch(application, accessToken, baseUrl, env, subscriptionDAO);
     }
     throw new BadRequestError('Unsupported provider.');
   }
@@ -139,6 +133,9 @@ interface StartApplicationWatchResponse extends IResponse {
 }
 
 interface StartApplicationWatchEnv extends IUserEnv {
+  OAUTH2_TOKEN_CACHE: KVNamespace;
+  OAUTH2_TOKEN_REFRESHERS: DurableObjectNamespace;
+  OAUTH2_ACCESS_TOKEN_MIN_VALID_SECONDS?: string | undefined;
   OUTLOOK_SUBSCRIPTION_TTL_DAYS?: string | undefined;
 }
 

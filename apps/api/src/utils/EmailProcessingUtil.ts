@@ -1,6 +1,6 @@
 import { PROVIDER_SUBSCRIPTION_STATUS_ACTIVE } from '@mail-otter/shared/constants';
 import { ConnectedApplicationDAO, ProcessedMessageDAO, ProviderSubscriptionDAO } from '@/dao';
-import type { ConnectedApplication, EmailQueueMessage, OAuth2Credentials, ProviderSubscription } from '@mail-otter/shared/model';
+import type { ConnectedApplication, EmailQueueMessage, ProviderSubscription } from '@mail-otter/shared/model';
 import { BadRequestError } from '@/error';
 import {
   ConfigurationManager,
@@ -8,7 +8,7 @@ import {
   EmailContextUtil,
   EmailSummaryUtil,
   GmailProviderUtil,
-  OAuth2ProviderUtil,
+  OAuth2AccessTokenService,
   OutlookProviderUtil,
 } from '@/utils';
 import type { GmailMessage } from './GmailProviderUtil';
@@ -26,7 +26,7 @@ class EmailProcessingUtil {
       throw new BadRequestError('Connected application does not have a provider mailbox address.');
     }
 
-    const accessToken: string = await EmailProcessingUtil.refreshAccessToken(application, env, applicationDAO);
+    const accessToken: string = await OAuth2AccessTokenService.getAccessToken(application.applicationId, env);
     const enabledApplicationIds: string[] = await applicationDAO.listContextEnabledApplicationIdsByUserEmail(application.userEmail);
     if (message.type === 'gmail-notification') {
       await EmailProcessingUtil.processGmailNotification(
@@ -159,22 +159,6 @@ class EmailProcessingUtil {
     }
   }
 
-  private static async refreshAccessToken(
-    application: ConnectedApplication,
-    env: EmailProcessingEnv,
-    applicationDAO: ConnectedApplicationDAO,
-  ): Promise<string> {
-    const credentials = application.credentials as OAuth2Credentials;
-    const tokenResult = await OAuth2ProviderUtil.refreshAccessToken({
-      providerId: application.providerId,
-      credentials,
-    });
-    if (tokenResult.refreshToken) {
-      await applicationDAO.updateOAuth2RefreshToken(application.applicationId, tokenResult.refreshToken);
-    }
-    return tokenResult.accessToken;
-  }
-
   private static async summarize(
     env: EmailProcessingEnv,
     subject: string,
@@ -195,8 +179,11 @@ class EmailProcessingUtil {
 interface EmailProcessingEnv {
   DB: D1Database;
   AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
+  OAUTH2_TOKEN_CACHE: KVNamespace;
+  OAUTH2_TOKEN_REFRESHERS: DurableObjectNamespace;
   AI: Ai;
   EMAIL_CONTEXT_INDEX?: Vectorize | undefined;
+  OAUTH2_ACCESS_TOKEN_MIN_VALID_SECONDS?: string | undefined;
   AI_SUMMARY_MODEL?: string | undefined;
   AI_EMBEDDING_MODEL?: string | undefined;
   MAX_EMAIL_BODY_CHARS?: string | undefined;

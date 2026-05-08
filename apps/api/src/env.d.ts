@@ -5,6 +5,9 @@ declare global {
     DB: D1Database;
     AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
     AI: Ai;
+    OAUTH2_TOKEN_CACHE: KVNamespace;
+    CRON_TASKS: DurableObjectNamespace;
+    OAUTH2_TOKEN_REFRESHERS: DurableObjectNamespace;
     EMAIL_EVENTS_QUEUE: Queue<EmailQueueMessage>;
     EMAIL_PROCESSING_WORKFLOW: Workflow<EmailQueueMessage>;
     EMAIL_CONTEXT_INDEX: Vectorize;
@@ -22,6 +25,10 @@ declare global {
     GMAIL_WATCH_RENEWAL_WINDOW_HOURS?: string | undefined;
     OUTLOOK_SUBSCRIPTION_RENEWAL_WINDOW_HOURS?: string | undefined;
     OUTLOOK_SUBSCRIPTION_TTL_DAYS?: string | undefined;
+    OAUTH2_ACCESS_TOKEN_REFRESH_WINDOW_SECONDS?: string | undefined;
+    OAUTH2_ACCESS_TOKEN_MIN_VALID_SECONDS?: string | undefined;
+    OAUTH2_ACCESS_TOKEN_FALLBACK_TTL_SECONDS?: string | undefined;
+    OAUTH2_TOKEN_REFRESH_BATCH_SIZE?: string | undefined;
   }
 }
 

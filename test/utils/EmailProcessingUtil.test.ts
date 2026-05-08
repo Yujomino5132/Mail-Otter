@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EmailProcessingUtil } from '@/utils/EmailProcessingUtil';
 import { ConnectedApplicationDAO, ProcessedMessageDAO } from '@/dao';
-import { OAuth2ProviderUtil } from '@/utils/OAuth2ProviderUtil';
+import { OAuth2AccessTokenService } from '@/utils/OAuth2AccessTokenService';
 import { OutlookProviderUtil } from '@/utils/OutlookProviderUtil';
 
 describe('EmailProcessingUtil', () => {
@@ -18,10 +18,7 @@ describe('EmailProcessingUtil', () => {
       credentials: { refreshToken: 'refresh-token' },
     } as never);
     vi.spyOn(ConnectedApplicationDAO.prototype, 'listContextEnabledApplicationIdsByUserEmail').mockResolvedValue([]);
-    vi.spyOn(OAuth2ProviderUtil, 'refreshAccessToken').mockResolvedValue({
-      accessToken: 'access-token',
-      refreshToken: undefined,
-    });
+    vi.spyOn(OAuth2AccessTokenService, 'getAccessToken').mockResolvedValue('access-token');
     const tryStart = vi.spyOn(ProcessedMessageDAO.prototype, 'tryStart').mockResolvedValue(true);
     const markSkipped = vi.spyOn(ProcessedMessageDAO.prototype, 'markSkipped').mockResolvedValue();
     const markError = vi.spyOn(ProcessedMessageDAO.prototype, 'markError').mockResolvedValue();
@@ -44,6 +41,8 @@ describe('EmailProcessingUtil', () => {
           AES_ENCRYPTION_KEY_SECRET: {
             get: vi.fn().mockResolvedValue('master-key'),
           } as never,
+          OAUTH2_TOKEN_CACHE: {} as KVNamespace,
+          OAUTH2_TOKEN_REFRESHERS: {} as DurableObjectNamespace,
           AI: {} as Ai,
         },
       ),

@@ -2,9 +2,8 @@ import { ConnectedApplicationDAO, OAuth2AuthorizationSessionDAO } from '@/dao';
 import { BadRequestError } from '@/error';
 import { IBaseRoute } from '@/endpoints/IBaseRoute';
 import type { ExtendedResponse, IEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IBaseRoute';
-import type { ConnectedApplication, OAuth2AuthorizationSession, OAuth2Credentials } from '@mail-otter/shared/model';
-import { GmailProviderUtil, OAuth2ProviderUtil, OAuth2StateUtil, OutlookProviderUtil } from '@/utils';
-import { PROVIDER_GOOGLE_GMAIL, PROVIDER_MICROSOFT_OUTLOOK } from '@mail-otter/shared/constants';
+import type { ConnectedApplication, OAuth2AuthorizationSession } from '@mail-otter/shared/model';
+import { OAuth2AccessTokenService, OAuth2StateUtil } from '@/utils';
 
 class OAuth2CallbackRoute extends IBaseRoute<OAuth2CallbackRequest, OAuth2CallbackResponse, OAuth2CallbackEnv> {
   schema = {
@@ -50,20 +49,12 @@ class OAuth2CallbackRoute extends IBaseRoute<OAuth2CallbackRequest, OAuth2Callba
     if (!application) {
       throw new BadRequestError('Connected application was not found.');
     }
-    const tokenResult = await OAuth2ProviderUtil.exchangeCode({
-      providerId: application.providerId,
-      credentials: application.credentials as OAuth2Credentials,
+    await OAuth2AccessTokenService.completeAuthorization({
+      applicationId,
       redirectUri: session.redirectUri,
       code,
       codeVerifier: session.codeVerifier,
-    });
-    const providerEmail: string =
-      application.providerId === PROVIDER_GOOGLE_GMAIL
-        ? (await GmailProviderUtil.getProfile(tokenResult.accessToken)).emailAddress
-        : application.providerId === PROVIDER_MICROSOFT_OUTLOOK
-          ? (await OutlookProviderUtil.getProfile(tokenResult.accessToken)).emailAddress
-          : application.userEmail;
-    await applicationDAO.markOAuth2Connected(applicationId, tokenResult.refreshToken!, providerEmail);
+    }, env);
     await sessionDAO.consume(session.sessionId);
     return this.redirect(`/user?oauth2=connected&applicationId=${encodeURIComponent(applicationId)}`);
   }
@@ -84,6 +75,9 @@ interface OAuth2CallbackResponse extends IResponse {}
 interface OAuth2CallbackEnv extends IEnv {
   DB: D1Database;
   AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
+  OAUTH2_TOKEN_CACHE: KVNamespace;
+  OAUTH2_TOKEN_REFRESHERS: DurableObjectNamespace;
+  OAUTH2_ACCESS_TOKEN_MIN_VALID_SECONDS?: string | undefined;
 }
 
 export { OAuth2CallbackRoute };

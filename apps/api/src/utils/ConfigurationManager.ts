@@ -7,6 +7,10 @@ import {
   DEFAULT_MAX_EMAIL_BODY_CHARS,
   DEFAULT_MAX_RAG_CONTEXT_CHARS,
   DEFAULT_OAUTH2_STATE_EXPIRY_MINUTES,
+  DEFAULT_OAUTH2_ACCESS_TOKEN_FALLBACK_TTL_SECONDS,
+  DEFAULT_OAUTH2_ACCESS_TOKEN_MIN_VALID_SECONDS,
+  DEFAULT_OAUTH2_ACCESS_TOKEN_REFRESH_WINDOW_SECONDS,
+  DEFAULT_OAUTH2_TOKEN_REFRESH_BATCH_SIZE,
   DEFAULT_OUTLOOK_SUBSCRIPTION_RENEWAL_WINDOW_HOURS,
   DEFAULT_OUTLOOK_SUBSCRIPTION_TTL_DAYS,
   DEFAULT_RAG_TOP_K,
@@ -69,6 +73,34 @@ class ConfigurationManager {
 
   public static getServeSpaFromWorker(env: unknown): boolean {
     return ConfigurationManager.getBoolean(env, 'SERVE_SPA_FROM_WORKER', DEFAULT_SERVE_SPA_FROM_WORKER);
+  }
+
+  public static getOAuth2AccessTokenRefreshWindowSeconds(env: unknown): number {
+    return ConfigurationManager.getPositiveInt(
+      env,
+      'OAUTH2_ACCESS_TOKEN_REFRESH_WINDOW_SECONDS',
+      DEFAULT_OAUTH2_ACCESS_TOKEN_REFRESH_WINDOW_SECONDS,
+    );
+  }
+
+  public static getOAuth2AccessTokenMinValidSeconds(env: unknown): number {
+    return ConfigurationManager.getPositiveInt(
+      env,
+      'OAUTH2_ACCESS_TOKEN_MIN_VALID_SECONDS',
+      DEFAULT_OAUTH2_ACCESS_TOKEN_MIN_VALID_SECONDS,
+    );
+  }
+
+  public static getOAuth2AccessTokenFallbackTtlSeconds(env: unknown): number {
+    return ConfigurationManager.getPositiveInt(
+      env,
+      'OAUTH2_ACCESS_TOKEN_FALLBACK_TTL_SECONDS',
+      DEFAULT_OAUTH2_ACCESS_TOKEN_FALLBACK_TTL_SECONDS,
+    );
+  }
+
+  public static getOAuth2TokenRefreshBatchSize(env: unknown): number {
+    return ConfigurationManager.getPositiveInt(env, 'OAUTH2_TOKEN_REFRESH_BATCH_SIZE', DEFAULT_OAUTH2_TOKEN_REFRESH_BATCH_SIZE);
   }
 
   private static getPositiveInt(env: unknown, key: string, defaultValue: string): number {

@@ -1,6 +1,6 @@
 {
-  // "$version": 1778166798,
-  // "$minimumVersion": 1778100466,
+  // "$version": 1778244052,
+  // "$minimumVersion": 1778244052,
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "mail-otter",
   "main": "apps/api/src/index.ts",
@@ -29,6 +29,24 @@
   "assets": {
     "directory": "./apps/web/dist/",
   },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CRON_TASKS",
+        "class_name": "CronTasksWorker",
+      },
+      {
+        "name": "OAUTH2_TOKEN_REFRESHERS",
+        "class_name": "OAuth2TokenRefreshWorker",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1778260000",
+      "new_sqlite_classes": ["CronTasksWorker", "OAuth2TokenRefreshWorker"],
+    },
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -43,6 +61,13 @@
     {
       "binding": "EMAIL_CONTEXT_INDEX",
       "index_name": "mail-otter-email-context",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH2_TOKEN_CACHE",
+      "id": "00000000000000000000000000000000",
+      // "kv_name": "mail-otter-oauth2-token-cache",
     },
   ],
   "workflows": [
@@ -69,7 +94,7 @@
     ],
   },
   "triggers": {
-    "crons": ["0 * * * *"],
+    "crons": ["*/10 * * * *"],
   },
   "secrets_store_secrets": [
     {
@@ -94,5 +119,9 @@
     "GMAIL_WATCH_RENEWAL_WINDOW_HOURS": "48",
     "OUTLOOK_SUBSCRIPTION_RENEWAL_WINDOW_HOURS": "24",
     "OUTLOOK_SUBSCRIPTION_TTL_DAYS": "6",
+    "OAUTH2_ACCESS_TOKEN_REFRESH_WINDOW_SECONDS": "900",
+    "OAUTH2_ACCESS_TOKEN_MIN_VALID_SECONDS": "60",
+    "OAUTH2_ACCESS_TOKEN_FALLBACK_TTL_SECONDS": "3600",
+    "OAUTH2_TOKEN_REFRESH_BATCH_SIZE": "25",
   },
 }

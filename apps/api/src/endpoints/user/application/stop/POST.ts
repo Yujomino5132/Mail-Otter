@@ -3,8 +3,8 @@ import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '@/dao';
 import { BadRequestError } from '@/error';
 import { IUserRoute } from '@/endpoints/IUserRoute';
 import type { IUserEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IUserRoute';
-import type { ConnectedApplication, OAuth2Credentials, ProviderSubscription } from '@mail-otter/shared/model';
-import { GmailProviderUtil, OAuth2ProviderUtil, OutlookProviderUtil } from '@/utils';
+import type { ConnectedApplication, ProviderSubscription } from '@mail-otter/shared/model';
+import { GmailProviderUtil, OAuth2AccessTokenService, OutlookProviderUtil } from '@/utils';
 
 class StopApplicationWatchRoute extends IUserRoute<StopApplicationWatchRequest, StopApplicationWatchResponse, StopApplicationWatchEnv> {
   schema = {
@@ -32,17 +32,11 @@ class StopApplicationWatchRoute extends IUserRoute<StopApplicationWatchRequest, 
 
     const subscriptionDAO = new ProviderSubscriptionDAO(env.DB);
     const subscription: ProviderSubscription | undefined = await subscriptionDAO.getByApplication(application.applicationId);
-    const tokenResult = await OAuth2ProviderUtil.refreshAccessToken({
-      providerId: application.providerId,
-      credentials: application.credentials as OAuth2Credentials,
-    });
-    if (tokenResult.refreshToken) {
-      await applicationDAO.updateOAuth2RefreshToken(application.applicationId, tokenResult.refreshToken);
-    }
+    const accessToken: string = await OAuth2AccessTokenService.getAccessToken(application.applicationId, env);
     if (application.providerId === PROVIDER_GOOGLE_GMAIL) {
-      await GmailProviderUtil.stopWatch(tokenResult.accessToken);
+      await GmailProviderUtil.stopWatch(accessToken);
     } else if (application.providerId === PROVIDER_MICROSOFT_OUTLOOK && subscription?.externalSubscriptionId) {
-      await OutlookProviderUtil.deleteSubscription(tokenResult.accessToken, subscription.externalSubscriptionId);
+      await OutlookProviderUtil.deleteSubscription(accessToken, subscription.externalSubscriptionId);
     }
     await subscriptionDAO.markStopped(application.applicationId);
     return { message: 'Provider notifications stopped.' };
@@ -57,6 +51,10 @@ interface StopApplicationWatchResponse extends IResponse {
   message: string;
 }
 
-type StopApplicationWatchEnv = IUserEnv;
+interface StopApplicationWatchEnv extends IUserEnv {
+  OAUTH2_TOKEN_CACHE: KVNamespace;
+  OAUTH2_TOKEN_REFRESHERS: DurableObjectNamespace;
+  OAUTH2_ACCESS_TOKEN_MIN_VALID_SECONDS?: string | undefined;
+}
 
 export { StopApplicationWatchRoute };
