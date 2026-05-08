@@ -9,6 +9,7 @@ export * from './EmailValidationUtil';
 export * from './EmailSummaryUtil';
 export * from './GmailProviderUtil';
 export * from './OutlookProviderUtil';
+export * from './OAuth2AccessTokenService';
 export * from './OAuth2ProviderUtil';
 export * from './OAuth2StateUtil';
 export * from './SubscriptionRenewalUtil';

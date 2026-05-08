@@ -22,7 +22,8 @@ import {
 } from '@/endpoints';
 import { MiddlewareHandlers } from '@/middleware';
 import { SPA_HTML } from '@/generated/spa-shell';
-import { ConfigurationManager, SubscriptionRenewalUtil } from '@/utils';
+import { DURABLE_OBJECT_CRON_TASKS_RUN_URL, DURABLE_OBJECT_NAMESPACE_GLOBAL } from '@/constants';
+import { ConfigurationManager } from '@/utils';
 
 class MailOtterWorker extends AbstractEntrypointWorker {
   protected readonly app: HonoOpenAPIRouterType<{
@@ -104,8 +105,29 @@ class MailOtterWorker extends AbstractEntrypointWorker {
     return this.app.fetch(request, env, ctx);
   }
 
-  protected async onScheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
-    await SubscriptionRenewalUtil.renewDueSubscriptions(env);
+  protected async onScheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    const cronTasksId: DurableObjectId = env.CRON_TASKS.idFromName(DURABLE_OBJECT_NAMESPACE_GLOBAL);
+    const cronTasksStub = env.CRON_TASKS.get(cronTasksId);
+    const cronTasksRequest: Request = new Request(DURABLE_OBJECT_CRON_TASKS_RUN_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        cron: event.cron,
+        scheduledTime: event.scheduledTime,
+      }),
+    });
+
+    ctx.waitUntil(
+      cronTasksStub
+        .fetch(cronTasksRequest)
+        .then(async (response: Response): Promise<void> => {
+          if (!response.ok && response.status !== 202) {
+            console.error('CronTasksWorker returned an error response:', response.status, await response.text());
+          }
+        })
+        .catch((error: unknown): void => {
+          console.error('Failed to invoke CronTasksWorker:', error);
+        }),
+    );
   }
 }
 

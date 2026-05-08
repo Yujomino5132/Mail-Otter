@@ -1,6 +1,9 @@
 export { UserDAO } from './UserDAO';
 export { ApplicationContextDAO } from './ApplicationContextDAO';
 export { ConnectedApplicationDAO } from './ConnectedApplicationDAO';
+export { IKeyValueDAO } from './IKeyValueDAO';
+export { OAuth2AccessTokenCacheDAO } from './OAuth2AccessTokenCacheDAO';
+export { OAuth2AccessTokenRefreshStatusDAO } from './OAuth2AccessTokenRefreshStatusDAO';
 export { OAuth2AuthorizationSessionDAO } from './OAuth2AuthorizationSessionDAO';
 export { ProcessedMessageDAO } from './ProcessedMessageDAO';
 export { ProviderSubscriptionDAO } from './ProviderSubscriptionDAO';

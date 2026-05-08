@@ -7,16 +7,16 @@ import {
 } from '@mail-otter/shared/constants';
 import type { ConnectedApplication, ProviderSubscription } from '@mail-otter/shared/model';
 import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '@/dao';
-import { OAuth2ProviderUtil, OutlookProviderUtil, SubscriptionRenewalUtil } from '@/utils';
+import { OAuth2AccessTokenService, OutlookProviderUtil, SubscriptionRenewalUtil } from '@/utils';
 
 vi.mock('@/dao', () => ({
   ConnectedApplicationDAO: vi.fn(),
   ProviderSubscriptionDAO: vi.fn(),
 }));
 
-vi.mock('@/utils/OAuth2ProviderUtil', () => ({
-  OAuth2ProviderUtil: {
-    refreshAccessToken: vi.fn(),
+vi.mock('@/utils/OAuth2AccessTokenService', () => ({
+  OAuth2AccessTokenService: {
+    getAccessToken: vi.fn(),
   },
 }));
 
@@ -73,7 +73,7 @@ describe('SubscriptionRenewalUtil', () => {
         updateOAuth2RefreshToken: vi.fn(),
       } as unknown as ConnectedApplicationDAO;
     });
-    vi.mocked(OAuth2ProviderUtil.refreshAccessToken).mockResolvedValue({ accessToken: 'access-token' });
+    vi.mocked(OAuth2AccessTokenService.getAccessToken).mockResolvedValue('access-token');
     vi.mocked(OutlookProviderUtil.renewSubscription).mockResolvedValue({
       id: 'renewed-subscription-id',
       resource: "/me/mailFolders('Inbox')/messages",
@@ -83,6 +83,8 @@ describe('SubscriptionRenewalUtil', () => {
     await SubscriptionRenewalUtil.renewDueSubscriptions({
       DB: {} as D1Database,
       AES_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') } as unknown as SecretsStoreSecret,
+      OAUTH2_TOKEN_CACHE: {} as KVNamespace,
+      OAUTH2_TOKEN_REFRESHERS: {} as DurableObjectNamespace,
     });
 
     expect(OutlookProviderUtil.renewSubscription).toHaveBeenCalledWith('access-token', 'graph-subscription-id', expect.any(Number));

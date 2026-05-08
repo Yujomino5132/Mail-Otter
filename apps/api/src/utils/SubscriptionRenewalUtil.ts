@@ -1,8 +1,8 @@
 import { PROVIDER_GOOGLE_GMAIL, PROVIDER_MICROSOFT_OUTLOOK } from '@mail-otter/shared/constants';
 import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '@/dao';
-import type { ConnectedApplication, OAuth2Credentials, ProviderSubscription } from '@mail-otter/shared/model';
+import type { ConnectedApplication, ProviderSubscription } from '@mail-otter/shared/model';
 import { TimestampUtil } from '@mail-otter/shared/utils';
-import { ConfigurationManager, GmailProviderUtil, OAuth2ProviderUtil, OutlookProviderUtil, WebhookSecurityUtil } from '@/utils';
+import { ConfigurationManager, GmailProviderUtil, OAuth2AccessTokenService, OutlookProviderUtil, WebhookSecurityUtil } from '@/utils';
 
 class SubscriptionRenewalUtil {
   public static async renewDueSubscriptions(env: SubscriptionRenewalEnv): Promise<void> {
@@ -36,7 +36,7 @@ class SubscriptionRenewalUtil {
   ): Promise<void> {
     const application: ConnectedApplication | undefined = await applicationDAO.getById(subscription.applicationId);
     if (!application || !application.gmailPubsubTopicName) return;
-    const accessToken: string = await SubscriptionRenewalUtil.refresh(application, applicationDAO);
+    const accessToken: string = await OAuth2AccessTokenService.getAccessToken(application.applicationId, _env);
     const watch = await GmailProviderUtil.watchInbox(accessToken, application.gmailPubsubTopicName);
     await subscriptionDAO.upsertActive({
       applicationId: application.applicationId,
@@ -56,7 +56,7 @@ class SubscriptionRenewalUtil {
   ): Promise<void> {
     const application: ConnectedApplication | undefined = await applicationDAO.getById(subscription.applicationId);
     if (!application || !subscription.externalSubscriptionId) return;
-    const accessToken: string = await SubscriptionRenewalUtil.refresh(application, applicationDAO);
+    const accessToken: string = await OAuth2AccessTokenService.getAccessToken(application.applicationId, env);
     const ttlDays: number = ConfigurationManager.getOutlookSubscriptionTtlDays(env);
     const expiresAt: number = TimestampUtil.addDays(TimestampUtil.getCurrentUnixTimestampInSeconds(), ttlDays);
     const renewed = await OutlookProviderUtil.renewSubscription(accessToken, subscription.externalSubscriptionId, expiresAt);
@@ -69,22 +69,14 @@ class SubscriptionRenewalUtil {
       expiresAt: renewed.expiresAt,
     });
   }
-
-  private static async refresh(application: ConnectedApplication, applicationDAO: ConnectedApplicationDAO): Promise<string> {
-    const tokenResult = await OAuth2ProviderUtil.refreshAccessToken({
-      providerId: application.providerId,
-      credentials: application.credentials as OAuth2Credentials,
-    });
-    if (tokenResult.refreshToken) {
-      await applicationDAO.updateOAuth2RefreshToken(application.applicationId, tokenResult.refreshToken);
-    }
-    return tokenResult.accessToken;
-  }
 }
 
 interface SubscriptionRenewalEnv {
   DB: D1Database;
   AES_ENCRYPTION_KEY_SECRET: SecretsStoreSecret;
+  OAUTH2_TOKEN_CACHE: KVNamespace;
+  OAUTH2_TOKEN_REFRESHERS: DurableObjectNamespace;
+  OAUTH2_ACCESS_TOKEN_MIN_VALID_SECONDS?: string | undefined;
   GMAIL_WATCH_RENEWAL_WINDOW_HOURS?: string | undefined;
   OUTLOOK_SUBSCRIPTION_RENEWAL_WINDOW_HOURS?: string | undefined;
   OUTLOOK_SUBSCRIPTION_TTL_DAYS?: string | undefined;

@@ -1,4 +1,4 @@
-import { ApplicationContextDAO, ConnectedApplicationDAO } from '@/dao';
+import { ApplicationContextDAO, ConnectedApplicationDAO, OAuth2AccessTokenCacheDAO } from '@/dao';
 import { IUserRoute } from '@/endpoints/IUserRoute';
 import type { IUserEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IUserRoute';
 import { EmailContextUtil } from '@/utils';
@@ -30,6 +30,7 @@ class DeleteApplicationRoute extends IUserRoute<DeleteApplicationRequest, Delete
       }
       await contextDAO.markDocumentsDeletedByVectorIds(request.applicationId, userEmail, vectorIds);
     }
+    await new OAuth2AccessTokenCacheDAO(env.OAUTH2_TOKEN_CACHE, masterKey).deleteAccessToken(request.applicationId);
     await dao.deleteForUser(request.applicationId, userEmail);
     return { success: true };
   }
@@ -45,6 +46,7 @@ interface DeleteApplicationResponse extends IResponse {
 
 interface DeleteApplicationEnv extends IUserEnv {
   EMAIL_CONTEXT_INDEX?: Vectorize | undefined;
+  OAUTH2_TOKEN_CACHE: KVNamespace;
 }
 
 export { DeleteApplicationRoute };
