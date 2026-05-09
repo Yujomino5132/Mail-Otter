@@ -72,7 +72,7 @@ describe('GmailProviderUtil', () => {
 
       await expect(
         GmailProviderUtil.sendSummaryReply('test-access-token', 'sender@example.com', originalMessage as never, 'Summary text'),
-      ).rejects.toThrow('Gmail send summary failed: Send failed');
+      ).rejects.toThrow('Gmail send summary failed (500): Send failed');
 
       expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
     });

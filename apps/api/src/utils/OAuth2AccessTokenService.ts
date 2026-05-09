@@ -1,6 +1,6 @@
 import { DURABLE_OBJECT_OAUTH2_TOKEN_REFRESHERS_EXCHANGE_URL, DURABLE_OBJECT_OAUTH2_TOKEN_REFRESHERS_REFRESH_URL } from '@/constants';
 import { OAuth2AccessTokenCacheDAO } from '@/dao';
-import { InternalServerError } from '@/error';
+import { OAuth2TokenNonRetryableError, OAuth2TokenRetryableError } from '@/error';
 import { ConfigurationManager } from './ConfigurationManager';
 
 interface OAuth2AccessTokenServiceEnv {
@@ -86,7 +86,11 @@ class OAuth2AccessTokenService {
     const text: string = await response.text();
     const data = text ? (JSON.parse(text) as Partial<OAuth2AccessTokenResult> & { error?: string | undefined }) : {};
     if (!response.ok || !data.accessToken || !data.expiresAt) {
-      throw new InternalServerError(`OAuth2 token worker failed: ${data.error || text || response.statusText}`);
+      const message: string = `OAuth2 token worker failed: ${data.error || text || response.statusText}`;
+      if (response.status >= 400 && response.status < 500) {
+        throw new OAuth2TokenNonRetryableError(message);
+      }
+      throw new OAuth2TokenRetryableError(message);
     }
     return {
       accessToken: data.accessToken,

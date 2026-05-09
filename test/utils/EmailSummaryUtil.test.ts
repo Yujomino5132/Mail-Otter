@@ -1,5 +1,5 @@
 import { EmailSummaryUtil } from '@/utils';
-import { InternalServerError } from '@/error';
+import { AiSummaryRetryableError } from '@/error';
 
 describe('EmailSummaryUtil', () => {
   it('renders a consistent summary format from structured AI output', async () => {
@@ -65,7 +65,7 @@ Action items:
     } as unknown as Ai;
 
     await expect(EmailSummaryUtil.summarizeEmail(ai, 'model', 'Status', 'sam@example.com', 'body')).rejects.toThrow(
-      new InternalServerError('Workers AI did not return a valid summary.'),
+      new AiSummaryRetryableError('Workers AI did not return a valid summary.'),
     );
   });
 

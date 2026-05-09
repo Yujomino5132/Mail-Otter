@@ -21,6 +21,7 @@ class ProcessedMessageDAO {
     providerId: ProviderId,
     providerMessageId: string,
     providerThreadId?: string | null,
+    options: TryStartProcessedMessageOptions = {},
   ): Promise<boolean> {
     const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const processedMessageId: string = UUIDUtil.getRandomUUID();
@@ -46,7 +47,12 @@ class ProcessedMessageDAO {
     if (!result.success) {
       throw new DatabaseError(`Failed to create processed message row: ${result.error}`);
     }
-    return ((result.meta as { changes?: number } | undefined)?.changes ?? 0) > 0;
+    const inserted: boolean = ((result.meta as { changes?: number } | undefined)?.changes ?? 0) > 0;
+    if (inserted || !options.allowExistingForRetry) {
+      return inserted;
+    }
+    const status: ProcessedMessageStatus | undefined = await this.getStatus(applicationId, providerMessageId);
+    return status === PROCESSED_MESSAGE_STATUS_PROCESSING || status === PROCESSED_MESSAGE_STATUS_ERROR;
   }
 
   public async markSummarized(applicationId: string, providerMessageId: string): Promise<void> {
@@ -100,6 +106,21 @@ class ProcessedMessageDAO {
     }
   }
 
+  private async getStatus(applicationId: string, providerMessageId: string): Promise<ProcessedMessageStatus | undefined> {
+    const row: { status: ProcessedMessageStatus } | null = await this.database
+      .prepare(
+        `
+          SELECT status
+          FROM processed_messages
+          WHERE application_id = ? AND provider_message_id = ?
+          LIMIT 1
+        `,
+      )
+      .bind(applicationId, providerMessageId)
+      .first<{ status: ProcessedMessageStatus }>();
+    return row?.status;
+  }
+
   private toProcessedMessage(row: ProcessedMessageInternal): ProcessedMessage {
     return {
       processedMessageId: row.processed_message_id,
@@ -114,6 +135,10 @@ class ProcessedMessageDAO {
       updatedAt: row.updated_at,
     };
   }
+}
+
+interface TryStartProcessedMessageOptions {
+  allowExistingForRetry?: boolean | undefined;
 }
 
 export { ProcessedMessageDAO };
