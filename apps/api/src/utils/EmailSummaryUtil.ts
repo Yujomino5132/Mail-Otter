@@ -1,7 +1,20 @@
 import { InternalServerError } from '@/error';
 
 interface GptOss20bOutput {
-  response?: string | undefined;
+  response: string;
+  usage?:
+    | {
+        prompt_tokens?: number;
+        completion_tokens?: number;
+        total_tokens?: number;
+      }
+    | undefined;
+  tool_calls?:
+    | Array<{
+        arguments?: Record<string, unknown> | undefined;
+        name?: string | undefined;
+      }>
+    | undefined;
 }
 
 class EmailSummaryUtil {
@@ -34,7 +47,7 @@ class EmailSummaryUtil {
       ...(ragContext ? ['', '--- PRIOR CONTEXT (for background only, do not summarize) ---', ragContext] : []),
     ].join('\n');
 
-    const result = (await ai.run(model, {
+    const result = (await (ai as unknown as { run: (...args: unknown[]) => Promise<unknown> }).run(model, {
       instructions,
       input,
       max_tokens: 512,
@@ -62,7 +75,7 @@ class EmailSummaryUtil {
       },
     })) as GptOss20bOutput;
 
-    const summaryText = typeof result === 'string' ? result : result?.response;
+    const summaryText = EmailSummaryUtil.extractResponseText(result);
     if (!summaryText) {
       throw new InternalServerError('Workers AI did not return a summary.');
     }
@@ -72,6 +85,17 @@ class EmailSummaryUtil {
       throw new InternalServerError('Workers AI did not return a valid summary.');
     }
     return EmailSummaryUtil.renderSummary(summary);
+  }
+
+  private static extractResponseText(result: GptOss20bOutput): string | undefined {
+    if (result.response) {
+      return typeof result.response === 'string' ? result.response : JSON.stringify(result.response);
+    }
+    if (result.tool_calls?.[0]?.arguments) {
+      const args = result.tool_calls[0].arguments;
+      return typeof args === 'string' ? args : JSON.stringify(args);
+    }
+    return undefined;
   }
 
   static parseAiSummaryResult(result: string): EmailSummary | undefined {
