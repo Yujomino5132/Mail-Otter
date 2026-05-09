@@ -123,7 +123,11 @@ class OAuth2ProviderUtil {
     });
     const data = (await response.json()) as OAuth2TokenResponse;
     if (!response.ok || !data.access_token) {
-      throw new InternalServerError(`OAuth2 token request failed: ${data.error_description || data.error || response.statusText}`);
+      const message: string = `OAuth2 token request failed: ${data.error_description || data.error || response.statusText}`;
+      if (response.status >= 400 && response.status < 500) {
+        throw new BadRequestError(message);
+      }
+      throw new InternalServerError(message);
     }
     return data;
   }

@@ -77,7 +77,7 @@ describe('OutlookProviderUtil', () => {
 
       await expect(
         OutlookProviderUtil.sendSelfSummaryReply('test-access-token', { id: 'original-msg-id' }, 'sender@example.com', 'Summary text'),
-      ).rejects.toThrow('Microsoft Graph send summary failed: Send failed');
+      ).rejects.toThrow('Microsoft Graph send summary failed (500): Send failed');
     });
 
     it('throws when createReply fails', async () => {
@@ -87,7 +87,7 @@ describe('OutlookProviderUtil', () => {
 
       await expect(
         OutlookProviderUtil.sendSelfSummaryReply('test-access-token', { id: 'original-msg-id' }, 'sender@example.com', 'Summary text'),
-      ).rejects.toThrow('Microsoft Graph API error: createReply failed');
+      ).rejects.toThrow('Microsoft Graph request failed (400): createReply failed');
     });
 
     it('throws when draft has no id', async () => {

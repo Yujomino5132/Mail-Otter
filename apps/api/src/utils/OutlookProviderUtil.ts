@@ -1,4 +1,4 @@
-import { InternalServerError } from '@/error';
+import { ProviderApiNonRetryableError, ProviderApiRetryableError } from '@/error';
 import { EmailContentUtil } from './EmailContentUtil';
 
 interface OutlookMailboxProfile {
@@ -34,7 +34,7 @@ class OutlookProviderUtil {
       userPrincipalName?: string | null | undefined;
     }>('https://graph.microsoft.com/v1.0/me?$select=mail,userPrincipalName', accessToken);
     const emailAddress: string | undefined = data.mail || data.userPrincipalName || undefined;
-    if (!emailAddress) throw new InternalServerError('Microsoft Graph profile did not include a mailbox address.');
+    if (!emailAddress) throw new ProviderApiNonRetryableError('Microsoft Graph profile did not include a mailbox address.');
     return { emailAddress };
   }
 
@@ -64,7 +64,7 @@ class OutlookProviderUtil {
       }),
     });
     if (!data.id || !data.expirationDateTime) {
-      throw new InternalServerError(`Microsoft Graph subscription response was incomplete: ${data.error?.message || 'missing id'}`);
+      throw new ProviderApiRetryableError(`Microsoft Graph subscription response was incomplete: ${data.error?.message || 'missing id'}`);
     }
     return {
       id: data.id,
@@ -88,7 +88,7 @@ class OutlookProviderUtil {
       body: JSON.stringify({ expirationDateTime: new Date(expiresAt * 1000).toISOString() }),
     });
     if (!data.id || !data.expirationDateTime) {
-      throw new InternalServerError('Microsoft Graph subscription renewal response was incomplete.');
+      throw new ProviderApiRetryableError('Microsoft Graph subscription renewal response was incomplete.');
     }
     return {
       id: data.id,
@@ -103,7 +103,7 @@ class OutlookProviderUtil {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!response.ok && response.status !== 404) {
-      throw new InternalServerError(`Microsoft Graph delete subscription failed: ${await response.text()}`);
+      throw OutlookProviderUtil.createApiError('delete subscription', response, await response.text());
     }
   }
 
@@ -139,7 +139,7 @@ class OutlookProviderUtil {
       },
     );
     if (!draft.id) {
-      throw new InternalServerError('Microsoft Graph createReply did not return a draft id.');
+      throw new ProviderApiRetryableError('Microsoft Graph createReply did not return a draft id.');
     }
     await OutlookProviderUtil.fetchJson<unknown>(
       `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(draft.id)}`,
@@ -166,7 +166,7 @@ class OutlookProviderUtil {
       },
     });
     if (!response.ok) {
-      throw new InternalServerError(`Microsoft Graph send summary failed: ${await response.text()}`);
+      throw OutlookProviderUtil.createApiError('send summary', response, await response.text());
     }
     await OutlookProviderUtil.deleteSentCopy(accessToken, draft.id);
   }
@@ -183,9 +183,21 @@ class OutlookProviderUtil {
     const text: string = await response.text();
     const data = text ? (JSON.parse(text) as T & { error?: { message?: string } }) : ({} as T & { error?: { message?: string } });
     if (!response.ok) {
-      throw new InternalServerError(`Microsoft Graph API error: ${data.error?.message || text || response.statusText}`);
+      throw OutlookProviderUtil.createApiError('request', response, data.error?.message || text || response.statusText);
     }
     return data as T;
+  }
+
+  private static createApiError(operation: string, response: Response, detail: string): Error {
+    const message: string = `Microsoft Graph ${operation} failed (${response.status}): ${detail || response.statusText}`;
+    if (OutlookProviderUtil.isRetryableStatus(response.status)) {
+      return new ProviderApiRetryableError(message);
+    }
+    return new ProviderApiNonRetryableError(message);
+  }
+
+  private static isRetryableStatus(status: number): boolean {
+    return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
   }
 
   private static async deleteSentCopy(accessToken: string, messageId: string): Promise<void> {

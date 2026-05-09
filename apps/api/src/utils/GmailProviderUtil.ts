@@ -1,4 +1,4 @@
-import { InternalServerError } from '@/error';
+import { ProviderApiNonRetryableError, ProviderApiRetryableError } from '@/error';
 import { EmailContentUtil } from './EmailContentUtil';
 import { WebhookSecurityUtil } from './WebhookSecurityUtil';
 import type { GmailMessagePart, MailHeader } from './EmailContentUtil';
@@ -44,7 +44,7 @@ class GmailProviderUtil {
     });
     const data = (await response.json()) as { historyId?: string; expiration?: string; error?: { message?: string } };
     if (!response.ok || !data.historyId || !data.expiration) {
-      throw new InternalServerError(`Gmail watch failed: ${data.error?.message || response.statusText}`);
+      throw GmailProviderUtil.createApiError('watch', response, data.error?.message || response.statusText);
     }
     return {
       historyId: data.historyId,
@@ -58,7 +58,7 @@ class GmailProviderUtil {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!response.ok) {
-      throw new InternalServerError(`Gmail stop failed: ${await response.text()}`);
+      throw GmailProviderUtil.createApiError('stop', response, await response.text());
     }
   }
 
@@ -122,7 +122,7 @@ class GmailProviderUtil {
       }),
     });
     if (!response.ok) {
-      throw new InternalServerError(`Gmail send summary failed: ${await response.text()}`);
+      throw GmailProviderUtil.createApiError('send summary', response, await response.text());
     }
     const sentMessage = (await response.json()) as { id: string };
     await GmailProviderUtil.trashGmailMessage(sentMessage.id, accessToken);
@@ -147,9 +147,21 @@ class GmailProviderUtil {
     const text: string = await response.text();
     const data = text ? (JSON.parse(text) as T & { error?: { message?: string } }) : ({} as T & { error?: { message?: string } });
     if (!response.ok) {
-      throw new InternalServerError(`Gmail API error: ${data.error?.message || text || response.statusText}`);
+      throw GmailProviderUtil.createApiError('request', response, data.error?.message || text || response.statusText);
     }
     return data as T;
+  }
+
+  private static createApiError(operation: string, response: Response, detail: string): Error {
+    const message: string = `Gmail ${operation} failed (${response.status}): ${detail || response.statusText}`;
+    if (GmailProviderUtil.isRetryableStatus(response.status)) {
+      return new ProviderApiRetryableError(message);
+    }
+    return new ProviderApiNonRetryableError(message);
+  }
+
+  private static isRetryableStatus(status: number): boolean {
+    return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
   }
 }
 

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OAuth2AccessTokenCacheDAO } from '@/dao';
 import { OAuth2AccessTokenService } from '@/utils/OAuth2AccessTokenService';
+import { OAuth2TokenNonRetryableError, OAuth2TokenRetryableError } from '@/error';
 
 describe('OAuth2AccessTokenService', () => {
   beforeEach(() => {
@@ -50,5 +51,35 @@ describe('OAuth2AccessTokenService', () => {
     expect(env.OAUTH2_TOKEN_REFRESHERS.get).toHaveBeenCalledWith(id);
     const request: Request = fetch.mock.calls[0][0];
     expect(new URL(request.url).pathname).toBe('/refresh');
+  });
+
+  it('classifies token worker client failures as non-retryable', async () => {
+    vi.spyOn(OAuth2AccessTokenCacheDAO.prototype, 'getCachedAccessToken').mockResolvedValue(undefined);
+    const fetch = vi.fn().mockResolvedValue(Response.json({ error: 'Connected application is not authorized.' }, { status: 400 }));
+    const env = {
+      AES_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
+      OAUTH2_TOKEN_CACHE: {} as KVNamespace,
+      OAUTH2_TOKEN_REFRESHERS: {
+        idFromName: vi.fn(() => ({} as DurableObjectId)),
+        get: vi.fn(() => ({ fetch })),
+      },
+    } as unknown as Env;
+
+    await expect(OAuth2AccessTokenService.getAccessToken('app-1', env)).rejects.toThrow(OAuth2TokenNonRetryableError);
+  });
+
+  it('classifies token worker server failures as retryable', async () => {
+    vi.spyOn(OAuth2AccessTokenCacheDAO.prototype, 'getCachedAccessToken').mockResolvedValue(undefined);
+    const fetch = vi.fn().mockResolvedValue(Response.json({ error: 'Temporary failure.' }, { status: 500 }));
+    const env = {
+      AES_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('master-key') },
+      OAUTH2_TOKEN_CACHE: {} as KVNamespace,
+      OAUTH2_TOKEN_REFRESHERS: {
+        idFromName: vi.fn(() => ({} as DurableObjectId)),
+        get: vi.fn(() => ({ fetch })),
+      },
+    } as unknown as Env;
+
+    await expect(OAuth2AccessTokenService.getAccessToken('app-1', env)).rejects.toThrow(OAuth2TokenRetryableError);
   });
 });

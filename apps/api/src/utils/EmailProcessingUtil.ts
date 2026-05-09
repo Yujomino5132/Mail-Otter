@@ -1,7 +1,7 @@
 import { PROVIDER_SUBSCRIPTION_STATUS_ACTIVE } from '@mail-otter/shared/constants';
 import { ConnectedApplicationDAO, ProcessedMessageDAO, ProviderSubscriptionDAO } from '@/dao';
 import type { ConnectedApplication, EmailQueueMessage, ProviderSubscription } from '@mail-otter/shared/model';
-import { BadRequestError } from '@/error';
+import { BadRequestError, NonRetryableError, RetryableError } from '@/error';
 import {
   ConfigurationManager,
   EmailContentUtil,
@@ -15,15 +15,19 @@ import type { GmailMessage } from './GmailProviderUtil';
 import type { OutlookMessage } from './OutlookProviderUtil';
 
 class EmailProcessingUtil {
-  public static async processQueueMessage(message: EmailQueueMessage, env: EmailProcessingEnv): Promise<void> {
+  public static async processQueueMessage(
+    message: EmailQueueMessage,
+    env: EmailProcessingEnv,
+    options: EmailProcessingOptions = {},
+  ): Promise<void> {
     const masterKey: string = await env.AES_ENCRYPTION_KEY_SECRET.get();
     const applicationDAO = new ConnectedApplicationDAO(env.DB, masterKey);
     const application: ConnectedApplication | undefined = await applicationDAO.getById(message.applicationId);
     if (!application) {
-      throw new BadRequestError('Connected application was not found for queued email event.');
+      throw new NonRetryableError('Connected application was not found for queued email event.');
     }
     if (!application.providerEmail) {
-      throw new BadRequestError('Connected application does not have a provider mailbox address.');
+      throw new NonRetryableError('Connected application does not have a provider mailbox address.');
     }
 
     const accessToken: string = await OAuth2AccessTokenService.getAccessToken(application.applicationId, env);
@@ -35,10 +39,11 @@ class EmailProcessingUtil {
         message.notificationHistoryId,
         env,
         enabledApplicationIds,
+        options,
       );
       return;
     }
-    await EmailProcessingUtil.processOutlookMessage(application, accessToken, message.messageId, env, enabledApplicationIds);
+    await EmailProcessingUtil.processOutlookMessage(application, accessToken, message.messageId, env, enabledApplicationIds, options);
   }
 
   private static async processGmailNotification(
@@ -47,6 +52,7 @@ class EmailProcessingUtil {
     notificationHistoryId: string,
     env: EmailProcessingEnv,
     enabledApplicationIds: string[],
+    options: EmailProcessingOptions,
   ): Promise<void> {
     const subscriptionDAO = new ProviderSubscriptionDAO(env.DB);
     const subscription: ProviderSubscription | undefined = await subscriptionDAO.getByApplication(application.applicationId);
@@ -54,7 +60,7 @@ class EmailProcessingUtil {
     const startHistoryId: string | undefined = subscription.gmailHistoryId || notificationHistoryId;
     const history = await GmailProviderUtil.listMessageIdsSince(accessToken, startHistoryId);
     for (const messageId of history.messageIds) {
-      await EmailProcessingUtil.processGmailMessage(application, accessToken, messageId, env, enabledApplicationIds);
+      await EmailProcessingUtil.processGmailMessage(application, accessToken, messageId, env, enabledApplicationIds, options);
     }
     await subscriptionDAO.updateGmailHistory(subscription.subscriptionId, history.historyId || notificationHistoryId);
   }
@@ -65,6 +71,7 @@ class EmailProcessingUtil {
     messageId: string,
     env: EmailProcessingEnv,
     enabledApplicationIds: string[],
+    options: EmailProcessingOptions,
   ): Promise<void> {
     const message: GmailMessage = await GmailProviderUtil.getMessage(accessToken, messageId);
     const headers = message.payload?.headers;
@@ -72,7 +79,9 @@ class EmailProcessingUtil {
     const from: string = EmailContentUtil.getHeader(headers, 'From') || '';
     const isSummary: boolean = EmailContentUtil.getHeader(headers, 'X-Mail-Otter-Summary')?.toLowerCase() === 'true';
     const processedDAO = new ProcessedMessageDAO(env.DB);
-    const started: boolean = await processedDAO.tryStart(application.applicationId, application.providerId, message.id, message.threadId);
+    const started: boolean = await processedDAO.tryStart(application.applicationId, application.providerId, message.id, message.threadId, {
+      allowExistingForRetry: EmailProcessingUtil.isRetryAttempt(options),
+    });
     if (!started) return;
     try {
       if (isSummary || EmailContentUtil.isFromMailbox(from, application.providerEmail)) {
@@ -94,8 +103,9 @@ class EmailProcessingUtil {
       await GmailProviderUtil.sendSummaryReply(accessToken, application.providerEmail!, message, summary);
       await processedDAO.markSummarized(application.applicationId, message.id);
     } catch (error: unknown) {
-      await processedDAO.markError(application.applicationId, message.id, EmailProcessingUtil.formatError(error));
-      throw error;
+      const processingError: Error = EmailProcessingUtil.classifyError(error);
+      await processedDAO.markError(application.applicationId, message.id, EmailProcessingUtil.formatError(processingError));
+      throw processingError;
     }
   }
 
@@ -105,9 +115,12 @@ class EmailProcessingUtil {
     messageId: string,
     env: EmailProcessingEnv,
     enabledApplicationIds: string[],
+    options: EmailProcessingOptions,
   ): Promise<void> {
     const processedDAO = new ProcessedMessageDAO(env.DB);
-    const started: boolean = await processedDAO.tryStart(application.applicationId, application.providerId, messageId, null);
+    const started: boolean = await processedDAO.tryStart(application.applicationId, application.providerId, messageId, null, {
+      allowExistingForRetry: EmailProcessingUtil.isRetryAttempt(options),
+    });
     if (!started) return;
 
     let message: OutlookMessage;
@@ -122,8 +135,9 @@ class EmailProcessingUtil {
         );
         return;
       }
-      await processedDAO.markError(application.applicationId, messageId, EmailProcessingUtil.formatError(error));
-      throw error;
+      const processingError: Error = EmailProcessingUtil.classifyError(error);
+      await processedDAO.markError(application.applicationId, messageId, EmailProcessingUtil.formatError(processingError));
+      throw processingError;
     }
 
     const from: string = message.from?.emailAddress?.address || message.sender?.emailAddress?.address || '';
@@ -154,8 +168,9 @@ class EmailProcessingUtil {
       await OutlookProviderUtil.sendSelfSummaryReply(accessToken, message, application.providerEmail!, summary);
       await processedDAO.markSummarized(application.applicationId, message.id);
     } catch (error: unknown) {
-      await processedDAO.markError(application.applicationId, message.id, EmailProcessingUtil.formatError(error));
-      throw error;
+      const processingError: Error = EmailProcessingUtil.classifyError(error);
+      await processedDAO.markError(application.applicationId, message.id, EmailProcessingUtil.formatError(processingError));
+      throw processingError;
     }
   }
 
@@ -173,6 +188,23 @@ class EmailProcessingUtil {
 
   private static formatError(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+  }
+
+  private static isRetryAttempt(options: EmailProcessingOptions): boolean {
+    return typeof options.retryAttempt === 'number' && options.retryAttempt > 1;
+  }
+
+  private static classifyError(error: unknown): Error {
+    if (error instanceof RetryableError || error instanceof NonRetryableError) {
+      return error;
+    }
+    if (error instanceof BadRequestError) {
+      return new NonRetryableError(error.message);
+    }
+    if (error instanceof Error) {
+      return new RetryableError(error.message);
+    }
+    return new RetryableError(String(error));
   }
 }
 
@@ -193,5 +225,9 @@ interface EmailProcessingEnv {
   RAG_VECTOR_QUERY_TOP_K?: string | undefined;
 }
 
+interface EmailProcessingOptions {
+  retryAttempt?: number | undefined;
+}
+
 export { EmailProcessingUtil };
-export type { EmailProcessingEnv };
+export type { EmailProcessingEnv, EmailProcessingOptions };

@@ -1,4 +1,4 @@
-import { InternalServerError } from '@/error';
+import { AiSummaryRetryableError } from '@/error';
 
 const SUMMARY_JSON_SCHEMA = {
   type: 'object',
@@ -81,12 +81,12 @@ class EmailSummaryUtil {
 
     const summaryText = EmailSummaryUtil.extractResponseText(result);
     if (!summaryText) {
-      throw new InternalServerError('Workers AI did not return a summary.');
+      throw new AiSummaryRetryableError('Workers AI did not return a summary.');
     }
 
     const summary = EmailSummaryUtil.parseAiSummaryResult(summaryText);
     if (!summary) {
-      throw new InternalServerError('Workers AI did not return a valid summary.');
+      throw new AiSummaryRetryableError('Workers AI did not return a valid summary.');
     }
     return EmailSummaryUtil.renderSummary(summary);
   }
