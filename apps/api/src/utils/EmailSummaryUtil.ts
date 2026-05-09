@@ -27,8 +27,8 @@ class EmailSummaryUtil {
       'Summarize this email for the mailbox owner.',
       'Use the PRIOR CONTEXT (if any) only as background, not as the email to summarize.',
       '',
-      `Subject: ${subject || '(no subject)' }`,
-      `From: ${from || '(unknown)' }`,
+      `Subject: ${subject || '(no subject)'}`,
+      `From: ${from || '(unknown)'}`,
       '',
       body,
       ...(ragContext ? ['', '--- PRIOR CONTEXT (for background only, do not summarize) ---', ragContext] : []),
@@ -93,7 +93,7 @@ class EmailSummaryUtil {
     const actionItems: string[] = EmailSummaryUtil.normalizeItems(summary.actionItems);
 
     return [
-      `Gist: ${ gist }`,
+      `Gist: ${gist}`,
       '',
       'Key details:',
       ...EmailSummaryUtil.renderList(keyDetails, 'No key details noted.'),
@@ -123,8 +123,8 @@ class EmailSummaryUtil {
   }
 
   private static renderList(items: string[], emptyValue: string): string[] {
-    if (items.length === 0) return [`- ${ emptyValue }`];
-    return items.map((item: string): string => `- ${ item }`);
+    if (items.length === 0) return [`- ${emptyValue}`];
+    return items.map((item: string): string => `- ${item}`);
   }
 
   private static normalizeItems(items: string[]): string[] {
