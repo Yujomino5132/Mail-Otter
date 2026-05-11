@@ -456,11 +456,11 @@ export default function SpaApp() {
                   </div>
 
                   <div className="mt-5 grid grid-cols-1 gap-4">
-                    <ReadOnlyField label="OAuth2 redirect URI" value={selectedApplication.oauth2RedirectUri || ''} />
+                    <ReadOnlyField label="OAuth2 redirect URI" value={selectedApplication.oauth2RedirectUri || ''} showCopy />
                     {selectedApplication.providerId === 'google-gmail' && (
                       <ReadOnlyField label="Gmail Pub/Sub topic" value={selectedApplication.gmailPubsubTopicName || ''} />
                     )}
-                    <ReadOnlyField label="Webhook endpoint" value={watchWebhookUrl || selectedApplication.webhookUrl || ''} />
+                    <ReadOnlyField label="Webhook endpoint" value={watchWebhookUrl || selectedApplication.webhookUrl || ''} showCopy />
                   </div>
 
                   <div className="mt-5 flex flex-wrap gap-2">
@@ -846,11 +846,28 @@ function ContextDeletionRunRow({
   );
 }
 
-function ReadOnlyField({ label, value }: { label: string; value: string }) {
+function ReadOnlyField({ label, value, showCopy = false }: { label: string; value: string; showCopy?: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
   return (
     <label className="block">
       <span className="block text-sm text-[#aab4c2] mb-2">{label}</span>
-      <input readOnly value={value} className="w-full min-w-0 px-3 py-2 rounded-md bg-[#0d1118] border border-[#2d3745] text-[#d1d5db]" />
+      <div className="flex">
+        <input readOnly value={value} className="min-w-0 px-3 py-2 rounded-l-md bg-[#0d1118] border border-[#2d3745] border-r-0 text-[#d1d5db] flex-1" />
+        {showCopy && (
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="px-3 py-2 rounded-r-md bg-[#2d3745] hover:bg-[#3d4a5c] border border-[#2d3745] text-[#d1d5db] text-sm"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        )}
+      </div>
     </label>
   );
 }
