@@ -83,6 +83,22 @@ class ProcessedMessageDAO {
     return row ? this.toProcessedMessage(row) : undefined;
   }
 
+  public async getLatestErrorForApplication(applicationId: string): Promise<ProcessedMessage | undefined> {
+    const row: ProcessedMessageInternal | null = await this.database
+      .prepare(
+        `
+          SELECT processed_message_id, application_id, provider_id, provider_message_id, provider_thread_id, status, summary_sent_at, error_message, created_at, updated_at
+          FROM processed_messages
+          WHERE application_id = ? AND status = ?
+          ORDER BY updated_at DESC
+          LIMIT 1
+        `,
+      )
+      .bind(applicationId, PROCESSED_MESSAGE_STATUS_ERROR)
+      .first<ProcessedMessageInternal>();
+    return row ? this.toProcessedMessage(row) : undefined;
+  }
+
   private async updateStatus(
     applicationId: string,
     providerMessageId: string,
