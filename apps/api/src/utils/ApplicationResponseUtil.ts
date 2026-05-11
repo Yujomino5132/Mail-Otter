@@ -18,6 +18,7 @@ class ApplicationResponseUtil {
     const contextDAO = new ApplicationContextDAO(env.DB);
     const subscription: ProviderSubscription | undefined = await subscriptionDAO.getByApplication(application.applicationId);
     const latestMessage: ProcessedMessage | undefined = await processedMessageDAO.getLatestForApplication(application.applicationId);
+    const latestError: ProcessedMessage | undefined = await processedMessageDAO.getLatestErrorForApplication(application.applicationId);
     const contextSummary: ApplicationContextSummary = await contextDAO.getSummaryByApplication(application.applicationId);
     const baseUrl: string = BaseUrlUtil.getBaseUrl(raw);
     return {
@@ -29,7 +30,7 @@ class ApplicationResponseUtil {
       watchStatus: subscription?.status,
       watchExpiresAt: subscription?.expiresAt,
       lastSummaryAt: latestMessage?.summarySentAt,
-      lastError: subscription?.lastError || latestMessage?.errorMessage,
+      lastError: subscription?.lastError || latestError?.errorMessage,
       contextDocumentCount: contextSummary.documentCount,
       contextLastIndexedAt: contextSummary.lastIndexedAt,
       contextLastDeleteAcceptedAt: contextSummary.lastDeleteAcceptedAt,
