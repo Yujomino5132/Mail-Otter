@@ -69,7 +69,7 @@ Action items:
     );
   });
 
-  it('does not request JSON mode from gpt-oss-20b and parses fenced JSON output', async () => {
+  it('does not request JSON mode from gpt-oss-120b and parses fenced JSON output', async () => {
     const ai = {
       run: vi.fn().mockResolvedValue({
         response: `Here is the summary:
@@ -84,7 +84,7 @@ Action items:
       }),
     } as unknown as Ai;
 
-    await expect(EmailSummaryUtil.summarizeEmail(ai, '@cf/openai/gpt-oss-20b', 'Campaign budget', 'sam@example.com', 'body')).resolves
+    await expect(EmailSummaryUtil.summarizeEmail(ai, '@cf/openai/gpt-oss-120b', 'Campaign budget', 'sam@example.com', 'body')).resolves
       .toBe(`Gist: The sender needs approval for the budget.
 
 Key details:
@@ -95,7 +95,7 @@ Action items:
 
 <Mail-Otter Summary>`);
     expect(ai.run).toHaveBeenCalledWith(
-      '@cf/openai/gpt-oss-20b',
+      '@cf/openai/gpt-oss-120b',
       expect.not.objectContaining({
         response_format: expect.anything(),
       }),
@@ -122,7 +122,7 @@ Action items:
       }),
     } as unknown as Ai;
 
-    await expect(EmailSummaryUtil.summarizeEmail(ai, '@cf/openai/gpt-oss-20b', 'Launch', 'sam@example.com', 'body')).resolves
+    await expect(EmailSummaryUtil.summarizeEmail(ai, '@cf/openai/gpt-oss-120b', 'Launch', 'sam@example.com', 'body')).resolves
       .toBe(`Gist: The email shares a launch update.
 
 Key details:
