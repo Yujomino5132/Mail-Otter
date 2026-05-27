@@ -3,7 +3,7 @@ import { EmailProcessingUtil } from '@mail-otter/backend-core/utils';
 import type { EmailProcessingEnv } from '@mail-otter/backend-core/utils';
 import { ConnectedApplicationDAO, ProcessedMessageDAO } from '@mail-otter/backend-data/dao';
 import { OAuth2AccessTokenService } from '@mail-otter/backend-core/utils';
-import { OutlookProviderUtil } from '@mail-otter/backend-core/utils';
+import { OutlookProviderUtil } from '@mail-otter/provider-clients/outlook';
 import { NonRetryableError, RetryableError } from '@mail-otter/backend-errors';
 
 describe('EmailProcessingUtil', () => {

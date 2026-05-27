@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GmailProviderUtil } from '@mail-otter/backend-core/utils';
+import { GmailProviderUtil } from '@mail-otter/provider-clients/gmail';
 
 describe('GmailProviderUtil', () => {
   beforeEach(() => {

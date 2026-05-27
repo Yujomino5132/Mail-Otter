@@ -4,7 +4,8 @@ import { BadRequestError } from '@mail-otter/backend-errors';
 import { IUserRoute } from '@/endpoints/IUserRoute';
 import type { IUserEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IUserRoute';
 import type { ConnectedApplication, OAuth2Credentials } from '@mail-otter/shared/model';
-import { BaseUrlUtil, ConfigurationManager, OAuth2ProviderUtil, OAuth2StateUtil, TimestampUtil } from '@mail-otter/backend-core/utils';
+import { BaseUrlUtil, ConfigurationManager, OAuth2StateUtil, TimestampUtil } from '@mail-otter/backend-core/utils';
+import { OAuth2ProviderUtil } from '@mail-otter/provider-clients/oauth2';
 
 class CreateOAuth2AuthorizationRoute extends IUserRoute<
   CreateOAuth2AuthorizationRequest,

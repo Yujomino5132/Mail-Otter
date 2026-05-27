@@ -4,15 +4,10 @@ import { BadRequestError } from '@mail-otter/backend-errors';
 import { IUserRoute } from '@/endpoints/IUserRoute';
 import type { IUserEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IUserRoute';
 import type { ConnectedApplication, ProviderSubscription } from '@mail-otter/shared/model';
-import {
-  BaseUrlUtil,
-  ConfigurationManager,
-  GmailProviderUtil,
-  OAuth2AccessTokenService,
-  OutlookProviderUtil,
-  TimestampUtil,
-  WebhookSecurityUtil,
-} from '@mail-otter/backend-core/utils';
+import { BaseUrlUtil, ConfigurationManager, OAuth2AccessTokenService, TimestampUtil } from '@mail-otter/backend-core/utils';
+import { GmailProviderUtil } from '@mail-otter/provider-clients/gmail';
+import { OutlookProviderUtil } from '@mail-otter/provider-clients/outlook';
+import { WebhookSecurityUtil } from '@mail-otter/provider-clients/webhook';
 
 class StartApplicationWatchRoute extends IUserRoute<StartApplicationWatchRequest, StartApplicationWatchResponse, StartApplicationWatchEnv> {
   schema = {

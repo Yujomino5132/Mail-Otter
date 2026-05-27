@@ -1,12 +1,12 @@
 import { PROVIDER_GOOGLE_GMAIL, PROVIDER_MICROSOFT_OUTLOOK } from '@mail-otter/shared/constants';
 import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '@mail-otter/backend-data/dao';
+import { GmailProviderUtil } from '@mail-otter/provider-clients/gmail';
+import { OutlookProviderUtil } from '@mail-otter/provider-clients/outlook';
+import { WebhookSecurityUtil } from '@mail-otter/provider-clients/webhook';
 import type { ConnectedApplication, ProviderSubscription } from '@mail-otter/shared/model';
 import { TimestampUtil } from '@mail-otter/shared/utils';
 import { ConfigurationManager } from './ConfigurationManager';
-import { GmailProviderUtil } from './GmailProviderUtil';
 import { OAuth2AccessTokenService } from './OAuth2AccessTokenService';
-import { OutlookProviderUtil } from './OutlookProviderUtil';
-import { WebhookSecurityUtil } from './WebhookSecurityUtil';
 
 class SubscriptionRenewalUtil {
   public static async renewDueSubscriptions(env: SubscriptionRenewalEnv): Promise<void> {

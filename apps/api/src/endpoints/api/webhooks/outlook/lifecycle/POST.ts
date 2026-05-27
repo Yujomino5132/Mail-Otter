@@ -3,7 +3,7 @@ import { BadRequestError, UnauthorizedError } from '@mail-otter/backend-errors';
 import { IBaseRoute } from '@/endpoints/IBaseRoute';
 import type { ExtendedResponse, IEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IBaseRoute';
 import type { ProviderSubscription } from '@mail-otter/shared/model';
-import { WebhookSecurityUtil } from '@mail-otter/backend-core/utils';
+import { WebhookSecurityUtil } from '@mail-otter/provider-clients/webhook';
 
 class OutlookLifecycleWebhookRoute extends IBaseRoute<
   OutlookLifecycleWebhookRequest,

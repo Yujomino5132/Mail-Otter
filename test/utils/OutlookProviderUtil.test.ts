@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { OutlookProviderUtil } from '@mail-otter/backend-core/utils';
+import { OutlookProviderUtil } from '@mail-otter/provider-clients/outlook';
 
 describe('OutlookProviderUtil', () => {
   beforeEach(() => {

@@ -1,16 +1,16 @@
 import { PROVIDER_SUBSCRIPTION_STATUS_ACTIVE } from '@mail-otter/shared/constants';
 import { ConnectedApplicationDAO, ProcessedMessageDAO, ProviderSubscriptionDAO } from '@mail-otter/backend-data/dao';
+import { EmailContentUtil } from '@mail-otter/provider-clients/email-content';
+import { GmailProviderUtil } from '@mail-otter/provider-clients/gmail';
+import { OutlookProviderUtil } from '@mail-otter/provider-clients/outlook';
+import type { GmailMessage } from '@mail-otter/provider-clients/gmail';
+import type { OutlookMessage } from '@mail-otter/provider-clients/outlook';
 import type { ConnectedApplication, EmailQueueMessage, ProviderSubscription } from '@mail-otter/shared/model';
 import { BadRequestError, NonRetryableError, RetryableError } from '@mail-otter/backend-errors';
 import { ConfigurationManager } from './ConfigurationManager';
-import { EmailContentUtil } from './EmailContentUtil';
 import { EmailContextUtil } from './EmailContextUtil';
 import { EmailSummaryUtil } from './EmailSummaryUtil';
-import { GmailProviderUtil } from './GmailProviderUtil';
 import { OAuth2AccessTokenService } from './OAuth2AccessTokenService';
-import { OutlookProviderUtil } from './OutlookProviderUtil';
-import type { GmailMessage } from './GmailProviderUtil';
-import type { OutlookMessage } from './OutlookProviderUtil';
 
 class EmailProcessingUtil {
   public static async processQueueMessage(

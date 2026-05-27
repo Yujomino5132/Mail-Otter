@@ -1,8 +1,8 @@
 import { ApplicationContextDAO } from '@mail-otter/backend-data/dao';
+import { EmailContentUtil } from '@mail-otter/provider-clients/email-content';
 import type { ApplicationContextDocument, ConnectedApplication } from '@mail-otter/shared/model';
 import { CryptoUtil } from '@mail-otter/shared/utils';
 import { ConfigurationManager } from './ConfigurationManager';
-import { EmailContentUtil } from './EmailContentUtil';
 
 class EmailContextUtil {
   public static async getUserVectorNamespace(userEmail: string): Promise<string> {

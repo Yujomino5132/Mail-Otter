@@ -80,6 +80,9 @@ importers:
       '@mail-otter/background':
         specifier: workspace:*
         version: link:../background
+      '@mail-otter/provider-clients':
+        specifier: workspace:*
+        version: link:../../packages/provider-clients
       '@mail-otter/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -114,6 +117,9 @@ importers:
       '@mail-otter/backend-runtime':
         specifier: workspace:*
         version: link:../../packages/backend-runtime
+      '@mail-otter/provider-clients':
+        specifier: workspace:*
+        version: link:../../packages/provider-clients
       '@mail-otter/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -167,22 +173,19 @@ importers:
       '@mail-otter/backend-runtime':
         specifier: workspace:*
         version: link:../backend-runtime
+      '@mail-otter/provider-clients':
+        specifier: workspace:*
+        version: link:../provider-clients
       '@mail-otter/shared':
         specifier: workspace:*
         version: link:../shared
       hono:
         specifier: ^4.12.18
         version: 4.12.21
-      html-to-text:
-        specifier: ^10.0.0
-        version: 10.0.0
       jose:
         specifier: ^6.2.0
         version: 6.2.3
     devDependencies:
-      '@types/html-to-text':
-        specifier: ^9.0.4
-        version: 9.0.4
       '@types/node':
         specifier: 25.9.x
         version: 25.9.1
@@ -225,6 +228,28 @@ importers:
         specifier: workspace:*
         version: link:../shared
     devDependencies:
+      '@types/node':
+        specifier: 25.9.x
+        version: 25.9.1
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
+  packages/provider-clients:
+    dependencies:
+      '@mail-otter/backend-errors':
+        specifier: workspace:*
+        version: link:../backend-errors
+      '@mail-otter/shared':
+        specifier: workspace:*
+        version: link:../shared
+      html-to-text:
+        specifier: ^10.0.0
+        version: 10.0.0
+    devDependencies:
+      '@types/html-to-text':
+        specifier: ^9.0.4
+        version: 9.0.4
       '@types/node':
         specifier: 25.9.x
         version: 25.9.1

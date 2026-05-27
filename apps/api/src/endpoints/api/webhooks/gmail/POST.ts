@@ -3,7 +3,7 @@ import { BadRequestError, UnauthorizedError } from '@mail-otter/backend-errors';
 import { IBaseRoute } from '@/endpoints/IBaseRoute';
 import type { IEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IBaseRoute';
 import type { EmailQueueMessage, ProviderSubscription } from '@mail-otter/shared/model';
-import { WebhookSecurityUtil } from '@mail-otter/backend-core/utils';
+import { WebhookSecurityUtil } from '@mail-otter/provider-clients/webhook';
 
 class GmailWebhookRoute extends IBaseRoute<GmailWebhookRequest, GmailWebhookResponse, GmailWebhookEnv> {
   schema = {
