@@ -26,7 +26,10 @@ class EmailValidationUtil {
       throw new UnauthorizedError('Missing required JWT verification configuration (TEAM_DOMAIN or POLICY_AUD not set).');
     }
 
-    const normalizedTeamDomain: string = teamDomain.replace(/\/+$/, '');
+    let normalizedTeamDomain: string = teamDomain;
+    while (normalizedTeamDomain.endsWith('/')) {
+      normalizedTeamDomain = normalizedTeamDomain.slice(0, -1);
+    }
     const normalizedPolicyAud: string = policyAud.trim();
 
     if (!normalizedPolicyAud) {
