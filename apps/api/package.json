@@ -9,6 +9,8 @@
   "dependencies": {
     "@mail-otter/background": "workspace:*",
     "@mail-otter/backend-core": "workspace:*",
+    "@mail-otter/backend-data": "workspace:*",
+    "@mail-otter/backend-errors": "workspace:*",
     "@mail-otter/backend-runtime": "workspace:*",
     "@mail-otter/shared": "workspace:*",
     "chanfana": "^3.3.0",

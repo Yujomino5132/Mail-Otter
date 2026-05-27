@@ -5,10 +5,10 @@ import {
   PROVIDER_GOOGLE_GMAIL,
   PROVIDER_MICROSOFT_OUTLOOK,
 } from '@mail-otter/shared/constants';
-import { ConnectedApplicationDAO, OAuth2AccessTokenCacheDAO, OAuth2AccessTokenRefreshStatusDAO } from '@mail-otter/backend-core/dao';
+import { ConnectedApplicationDAO, OAuth2AccessTokenCacheDAO, OAuth2AccessTokenRefreshStatusDAO } from '@mail-otter/backend-data/dao';
 import type { ConnectedApplication, OAuth2Credentials } from '@mail-otter/shared/model';
 import { TimestampUtil } from '@mail-otter/shared/utils';
-import { BadRequestError } from '@mail-otter/backend-core/error';
+import { BadRequestError } from '@mail-otter/backend-errors';
 import { ConfigurationManager, GmailProviderUtil, OAuth2ProviderUtil, OutlookProviderUtil } from '@mail-otter/backend-core/utils';
 import type { OAuth2TokenResult } from '@mail-otter/backend-core/utils';
 

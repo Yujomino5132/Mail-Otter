@@ -4,7 +4,7 @@ import {
   PROCESSED_MESSAGE_STATUS_SKIPPED,
   PROCESSED_MESSAGE_STATUS_SUMMARIZED,
 } from '@mail-otter/shared/constants';
-import { DatabaseError } from '../error';
+import { DatabaseError } from '@mail-otter/backend-errors';
 import type { ProcessedMessage, ProcessedMessageInternal } from '@mail-otter/shared/model';
 import type { ProcessedMessageStatus, ProviderId } from '@mail-otter/shared/constants';
 import { TimestampUtil, UUIDUtil } from '@mail-otter/shared/utils';

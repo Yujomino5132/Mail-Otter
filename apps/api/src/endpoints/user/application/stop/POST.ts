@@ -1,6 +1,6 @@
 import { PROVIDER_GOOGLE_GMAIL, PROVIDER_MICROSOFT_OUTLOOK } from '@mail-otter/shared/constants';
-import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '@mail-otter/backend-core/dao';
-import { BadRequestError } from '@mail-otter/backend-core/error';
+import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '@mail-otter/backend-data/dao';
+import { BadRequestError } from '@mail-otter/backend-errors';
 import { IUserRoute } from '@/endpoints/IUserRoute';
 import type { IUserEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IUserRoute';
 import type { ConnectedApplication, ProviderSubscription } from '@mail-otter/shared/model';

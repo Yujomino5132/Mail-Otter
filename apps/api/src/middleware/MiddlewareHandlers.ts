@@ -1,5 +1,5 @@
-import { UserDAO } from '@mail-otter/backend-core/dao';
-import { IServiceError } from '@mail-otter/backend-core/error';
+import { UserDAO } from '@mail-otter/backend-data/dao';
+import { IServiceError } from '@mail-otter/backend-errors';
 import { EmailValidationUtil } from '@mail-otter/backend-core/utils';
 import { Context, Next } from 'hono';
 

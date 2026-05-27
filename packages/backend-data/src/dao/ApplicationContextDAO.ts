@@ -5,7 +5,7 @@ import {
   APPLICATION_CONTEXT_DOCUMENT_STATUS_DELETED,
   APPLICATION_CONTEXT_DOCUMENT_STATUS_ERROR,
 } from '@mail-otter/shared/constants';
-import { DatabaseError } from '../error';
+import { DatabaseError } from '@mail-otter/backend-errors';
 import type {
   ApplicationContextDeletionRun,
   ApplicationContextDeletionRunInternal,

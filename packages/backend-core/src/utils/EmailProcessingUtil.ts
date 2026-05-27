@@ -1,7 +1,7 @@
 import { PROVIDER_SUBSCRIPTION_STATUS_ACTIVE } from '@mail-otter/shared/constants';
-import { ConnectedApplicationDAO, ProcessedMessageDAO, ProviderSubscriptionDAO } from '../dao';
+import { ConnectedApplicationDAO, ProcessedMessageDAO, ProviderSubscriptionDAO } from '@mail-otter/backend-data/dao';
 import type { ConnectedApplication, EmailQueueMessage, ProviderSubscription } from '@mail-otter/shared/model';
-import { BadRequestError, NonRetryableError, RetryableError } from '../error';
+import { BadRequestError, NonRetryableError, RetryableError } from '@mail-otter/backend-errors';
 import { ConfigurationManager } from './ConfigurationManager';
 import { EmailContentUtil } from './EmailContentUtil';
 import { EmailContextUtil } from './EmailContextUtil';

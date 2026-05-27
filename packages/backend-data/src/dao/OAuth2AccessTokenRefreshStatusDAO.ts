@@ -1,5 +1,5 @@
 import { CONNECTED_APPLICATION_STATUS_CONNECTED, CONNECTION_METHOD_OAUTH2 } from '@mail-otter/shared/constants';
-import { DatabaseError } from '../error';
+import { DatabaseError } from '@mail-otter/backend-errors';
 import { TimestampUtil } from '@mail-otter/shared/utils';
 
 interface OAuth2AccessTokenRefreshStatus {

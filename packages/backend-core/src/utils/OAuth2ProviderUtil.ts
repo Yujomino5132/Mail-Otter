@@ -1,6 +1,6 @@
 import { PROVIDER_GOOGLE_GMAIL, PROVIDER_MICROSOFT_OUTLOOK } from '@mail-otter/shared/constants';
 import type { ProviderId } from '@mail-otter/shared/constants';
-import { BadRequestError, InternalServerError } from '../error';
+import { BadRequestError, InternalServerError } from '@mail-otter/backend-errors';
 import type { OAuth2Credentials } from '@mail-otter/shared/model';
 
 interface OAuth2AuthorizationInput {

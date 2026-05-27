@@ -1,4 +1,4 @@
-import { DatabaseError } from '../error';
+import { DatabaseError } from '@mail-otter/backend-errors';
 import type { OAuth2AuthorizationSession, OAuth2AuthorizationSessionInternal } from '@mail-otter/shared/model';
 import { TimestampUtil, UUIDUtil } from '@mail-otter/shared/utils';
 

@@ -1,4 +1,4 @@
-import { ApplicationContextDAO, ConnectedApplicationDAO, OAuth2AccessTokenCacheDAO } from '@mail-otter/backend-core/dao';
+import { ApplicationContextDAO, ConnectedApplicationDAO, OAuth2AccessTokenCacheDAO } from '@mail-otter/backend-data/dao';
 import { IUserRoute } from '@/endpoints/IUserRoute';
 import type { IUserEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IUserRoute';
 import { EmailContextUtil } from '@mail-otter/backend-core/utils';

@@ -1,6 +1,6 @@
 import { APPLICATION_CONTEXT_DELETION_STATUS_ACCEPTED, APPLICATION_CONTEXT_DELETION_STATUS_ERROR } from '@mail-otter/shared/constants';
-import { ApplicationContextDAO, ConnectedApplicationDAO } from '@mail-otter/backend-core/dao';
-import { BadRequestError } from '@mail-otter/backend-core/error';
+import { ApplicationContextDAO, ConnectedApplicationDAO } from '@mail-otter/backend-data/dao';
+import { BadRequestError } from '@mail-otter/backend-errors';
 import { IUserRoute } from '@/endpoints/IUserRoute';
 import type { IUserEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IUserRoute';
 import type { ApplicationContextDeletionRun, ConnectedApplicationMetadata } from '@mail-otter/shared/model';

@@ -1,4 +1,4 @@
-import { DatabaseError } from '../error';
+import { DatabaseError } from '@mail-otter/backend-errors';
 import type { User, UserInternal } from '@mail-otter/shared/model';
 import { TimestampUtil } from '@mail-otter/shared/utils';
 

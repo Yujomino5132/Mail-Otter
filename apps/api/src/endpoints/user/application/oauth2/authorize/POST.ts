@@ -1,6 +1,6 @@
 import { CONNECTION_METHOD_OAUTH2 } from '@mail-otter/shared/constants';
-import { ConnectedApplicationDAO, OAuth2AuthorizationSessionDAO } from '@mail-otter/backend-core/dao';
-import { BadRequestError } from '@mail-otter/backend-core/error';
+import { ConnectedApplicationDAO, OAuth2AuthorizationSessionDAO } from '@mail-otter/backend-data/dao';
+import { BadRequestError } from '@mail-otter/backend-errors';
 import { IUserRoute } from '@/endpoints/IUserRoute';
 import type { IUserEnv, IRequest, IResponse, RouteContext } from '@/endpoints/IUserRoute';
 import type { ConnectedApplication, OAuth2Credentials } from '@mail-otter/shared/model';

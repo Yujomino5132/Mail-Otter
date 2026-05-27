@@ -1,4 +1,4 @@
-import { ProviderApiNonRetryableError, ProviderApiRetryableError } from '../error';
+import { ProviderApiNonRetryableError, ProviderApiRetryableError } from '@mail-otter/backend-errors';
 import { EmailContentUtil } from './EmailContentUtil';
 
 interface OutlookMailboxProfile {

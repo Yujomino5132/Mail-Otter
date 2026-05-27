@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ConnectedApplicationDAO, OAuth2AccessTokenCacheDAO, OAuth2AccessTokenRefreshStatusDAO } from '@mail-otter/backend-core/dao';
+import { ConnectedApplicationDAO, OAuth2AccessTokenCacheDAO, OAuth2AccessTokenRefreshStatusDAO } from '@mail-otter/backend-data/dao';
 import { OAuth2ProviderUtil } from '@mail-otter/backend-core/utils';
 import { OutlookProviderUtil } from '@mail-otter/backend-core/utils';
 import { OAuth2TokenRefreshWorker } from '@mail-otter/background';

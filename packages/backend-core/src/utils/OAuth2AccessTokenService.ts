@@ -1,6 +1,6 @@
 import { DURABLE_OBJECT_OAUTH2_TOKEN_REFRESHERS_EXCHANGE_URL, DURABLE_OBJECT_OAUTH2_TOKEN_REFRESHERS_REFRESH_URL } from '@mail-otter/backend-runtime/constants';
-import { OAuth2AccessTokenCacheDAO } from '../dao';
-import { OAuth2TokenNonRetryableError, OAuth2TokenRetryableError } from '../error';
+import { OAuth2AccessTokenCacheDAO } from '@mail-otter/backend-data/dao';
+import { OAuth2TokenNonRetryableError, OAuth2TokenRetryableError } from '@mail-otter/backend-errors';
 import { ConfigurationManager } from './ConfigurationManager';
 
 interface OAuth2AccessTokenServiceEnv {

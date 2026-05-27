@@ -1,4 +1,4 @@
-import { AiSummaryRetryableError } from '../error';
+import { AiSummaryRetryableError } from '@mail-otter/backend-errors';
 
 const SUMMARY_JSON_SCHEMA = {
   type: 'object',

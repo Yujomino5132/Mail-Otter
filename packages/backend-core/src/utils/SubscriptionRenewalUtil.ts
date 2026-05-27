@@ -1,5 +1,5 @@
 import { PROVIDER_GOOGLE_GMAIL, PROVIDER_MICROSOFT_OUTLOOK } from '@mail-otter/shared/constants';
-import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '../dao';
+import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '@mail-otter/backend-data/dao';
 import type { ConnectedApplication, ProviderSubscription } from '@mail-otter/shared/model';
 import { TimestampUtil } from '@mail-otter/shared/utils';
 import { ConfigurationManager } from './ConfigurationManager';

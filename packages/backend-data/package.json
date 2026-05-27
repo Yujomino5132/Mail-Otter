@@ -1,5 +1,5 @@
 {
-  "name": "@mail-otter/backend-core",
+  "name": "@mail-otter/backend-data",
   "version": "1.0.0",
   "private": true,
   "main": "./src/index.ts",
@@ -8,21 +8,19 @@
     ".": "./src/index.ts",
     "./constants": "./src/constants/index.ts",
     "./constants/*": "./src/constants/*.ts",
-    "./utils": "./src/utils/index.ts",
-    "./utils/*": "./src/utils/*.ts"
+    "./crypto": "./src/crypto/index.ts",
+    "./crypto/*": "./src/crypto/*.ts",
+    "./dao": "./src/dao/index.ts",
+    "./dao/*": "./src/dao/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mail-otter/backend-runtime": "workspace:*",
-    "@mail-otter/shared": "workspace:*",
-    "hono": "^4.12.18",
-    "html-to-text": "^10.0.0",
-    "jose": "^6.2.0"
+    "@mail-otter/backend-errors": "workspace:*",
+    "@mail-otter/shared": "workspace:*"
   },
   "devDependencies": {
-    "@types/html-to-text": "^9.0.4",
     "@types/node": "25.9.x",
     "typescript": "^6.0.3"
   }

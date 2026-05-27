@@ -6,7 +6,7 @@ import {
   PROVIDER_SUBSCRIPTION_STATUS_ACTIVE,
 } from '@mail-otter/shared/constants';
 import type { ConnectedApplication, ProviderSubscription } from '@mail-otter/shared/model';
-import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '@mail-otter/backend-core/dao';
+import { ConnectedApplicationDAO, ProviderSubscriptionDAO } from '@mail-otter/backend-data/dao';
 import { OAuth2AccessTokenService, OutlookProviderUtil, SubscriptionRenewalUtil } from '@mail-otter/backend-core/utils';
 
 describe('SubscriptionRenewalUtil', () => {

@@ -1,4 +1,4 @@
-import { ApplicationContextDAO, ProcessedMessageDAO, ProviderSubscriptionDAO } from '../dao';
+import { ApplicationContextDAO, ProcessedMessageDAO, ProviderSubscriptionDAO } from '@mail-otter/backend-data/dao';
 import type {
   ApplicationContextSummary,
   ConnectedApplicationMetadata,

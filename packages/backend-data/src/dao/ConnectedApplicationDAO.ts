@@ -5,7 +5,7 @@ import {
   CONNECTION_METHOD_OAUTH2,
 } from '@mail-otter/shared/constants';
 import { decryptData, encryptData } from '../crypto';
-import { DatabaseError } from '../error';
+import { DatabaseError } from '@mail-otter/backend-errors';
 import type {
   ConnectedApplication,
   ConnectedApplicationCredentials,

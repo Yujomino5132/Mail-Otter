@@ -3,7 +3,7 @@ import {
   PROVIDER_SUBSCRIPTION_STATUS_ERROR,
   PROVIDER_SUBSCRIPTION_STATUS_STOPPED,
 } from '@mail-otter/shared/constants';
-import { DatabaseError } from '../error';
+import { DatabaseError } from '@mail-otter/backend-errors';
 import type { ProviderId } from '@mail-otter/shared/constants';
 import type { ProviderSubscription, ProviderSubscriptionInternal } from '@mail-otter/shared/model';
 import { TimestampUtil, UUIDUtil } from '@mail-otter/shared/utils';
