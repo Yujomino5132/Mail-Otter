@@ -185,6 +185,17 @@ class ProviderSubscriptionDAO {
     }
   }
 
+  public async recordTransientError(subscriptionId: string, errorMessage: string): Promise<void> {
+    const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    const result: D1Result = await this.database
+      .prepare('UPDATE provider_subscriptions SET last_error = ?, updated_at = ? WHERE subscription_id = ?')
+      .bind(errorMessage.slice(0, 1024), now, subscriptionId)
+      .run();
+    if (!result.success) {
+      throw new DatabaseError(`Failed to record transient error on provider subscription: ${result.error}`);
+    }
+  }
+
   private async getById(subscriptionId: string): Promise<ProviderSubscription | undefined> {
     const row: ProviderSubscriptionInternal | null = await this.database
       .prepare(

@@ -6,6 +6,7 @@ import { WebhookSecurityUtil } from '@mail-otter/provider-clients/webhook';
 import type { ConnectedApplication, ProviderSubscription } from '@mail-otter/shared/model';
 import { TimestampUtil } from '@mail-otter/shared/utils';
 import { ConfigurationManager } from '@mail-otter/backend-runtime/config';
+import { RetryableError } from '@mail-otter/backend-errors';
 import { OAuth2AccessTokenService } from '../oauth2/OAuth2AccessTokenService';
 
 class SubscriptionRenewalUtil {
@@ -27,7 +28,12 @@ class SubscriptionRenewalUtil {
           await SubscriptionRenewalUtil.renewOutlook(subscription, applicationDAO, subscriptionDAO, env);
         }
       } catch (error: unknown) {
-        await subscriptionDAO.markError(subscription.subscriptionId, error instanceof Error ? error.message : String(error));
+        const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof RetryableError) {
+          await subscriptionDAO.recordTransientError(subscription.subscriptionId, message);
+        } else {
+          await subscriptionDAO.markError(subscription.subscriptionId, message);
+        }
       }
     }
   }
