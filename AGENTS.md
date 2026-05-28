@@ -81,6 +81,21 @@ Run `volta run pnpm run cf-typegen` after changing bindings in Wrangler config.
 - `functions/[[path]].ts` proxies Cloudflare Pages requests to the API Worker through a service binding.
 - `test/` contains Vitest suites for workers, schemas, and utilities.
 
+## Import Direction
+
+Packages are organized in layers. Higher layers may import from lower layers; lower layers must not import upward.
+
+```
+Layer 0: shared, backend-errors          — zero @mail-otter/* deps
+Layer 1: backend-runtime                 → layer 0 only
+Layer 2: backend-data, provider-clients  → layer 0 only
+Layer 3: backend-services                → layers 0–2 (not apps)
+Layer 5: apps/background                 → layers 0–3 (including provider-clients directly)
+         apps/api                        → layers 0–3 + background (NOT provider-clients directly)
+```
+
+Enforced by ESLint `no-restricted-imports` rules in `eslint.config.mjs`.
+
 ## Build And Runtime Notes
 
 - The root package is `@mail-otter/monorepo` and uses pnpm workspaces.
