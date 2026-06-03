@@ -18,6 +18,7 @@ interface ConnectedApplicationMetadata {
   status: ConnectedApplicationStatus;
   contextIndexingEnabled: boolean;
   gmailPubsubTopicName?: string | null | undefined;
+  watchedFolderIds?: string[] | null | undefined;
   oauth2RedirectUri?: string | undefined;
   webhookUrl?: string | undefined;
   watchStatus?: string | undefined;
@@ -48,6 +49,7 @@ interface ConnectedApplicationInternal {
   status: ConnectedApplicationStatus;
   context_indexing_enabled: number;
   gmail_pubsub_topic_name: string | null;
+  watched_folder_ids: string | null;
   created_at: number;
   updated_at: number;
 }

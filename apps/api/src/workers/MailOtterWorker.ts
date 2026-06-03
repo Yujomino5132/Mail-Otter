@@ -8,6 +8,7 @@ import {
   DeleteApplicationContextDocumentsRoute,
   GetCurrentUserRoute,
   GetApplicationContextDocumentProviderLinkRoute,
+  GetApplicationFoldersRoute,
   GmailWebhookRoute,
   ListApplicationContextDeletionRunsRoute,
   ListApplicationContextDocumentsRoute,
@@ -19,6 +20,7 @@ import {
   StopApplicationWatchRoute,
   UpdateApplicationContextRoute,
   UpdateApplicationRoute,
+  UpdateApplicationWatchSettingsRoute,
 } from '@/endpoints';
 import { MiddlewareHandlers } from '@/middleware';
 import { SPA_HTML } from '@/generated/spa-shell';
@@ -76,6 +78,8 @@ class MailOtterWorker extends AbstractEntrypointWorker {
     openapi.get('/user/application/context/documents', ListApplicationContextDocumentsRoute);
     openapi.get('/user/application/context/deletions', ListApplicationContextDeletionRunsRoute);
     openapi.get('/user/application/context/document/:contextDocumentId/provider-link', GetApplicationContextDocumentProviderLinkRoute);
+    openapi.get('/user/application/folders', GetApplicationFoldersRoute);
+    openapi.put('/user/application/watch-settings', UpdateApplicationWatchSettingsRoute);
     openapi.post('/user/application/oauth2/authorize', CreateOAuth2AuthorizationRoute);
     openapi.post('/user/application/watch', StartApplicationWatchRoute);
     openapi.post('/user/application/stop', StopApplicationWatchRoute);

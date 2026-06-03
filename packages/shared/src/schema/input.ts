@@ -52,6 +52,15 @@ const OAuth2AuthorizeBodySchema = z.object({
   applicationId: UuidSchema,
 });
 
+const ApplicationFoldersQuerySchema = z.object({
+  applicationId: UuidSchema,
+});
+
+const UpdateApplicationWatchSettingsBodySchema = z.object({
+  applicationId: UuidSchema,
+  folderIds: z.array(nonEmptyStringSchema('folderIds', 512)).nullable(),
+});
+
 const WatchApplicationBodySchema = z.object({
   applicationId: UuidSchema,
 });
@@ -112,6 +121,8 @@ const RequestInputSchemas: Record<string, RequestInputSchema> = {
   'GET /user/application/context/deletions': { query: ApplicationContextDeletionRunsQuerySchema },
   'GET /user/application/context/document/:contextDocumentId/provider-link': {},
   'POST /user/application/oauth2/authorize': { body: OAuth2AuthorizeBodySchema },
+  'GET /user/application/folders': { query: ApplicationFoldersQuerySchema },
+  'PUT /user/application/watch-settings': { body: UpdateApplicationWatchSettingsBodySchema },
   'POST /user/application/watch': { body: WatchApplicationBodySchema },
   'POST /user/application/stop': { body: StopApplicationBodySchema },
   'GET /api/oauth2/callback/:applicationId': { query: OAuth2CallbackQuerySchema },

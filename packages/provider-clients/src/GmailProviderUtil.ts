@@ -24,12 +24,26 @@ interface GmailProfile {
   emailAddress: string;
 }
 
+interface GmailLabel {
+  id: string;
+  name: string;
+  type: string;
+}
+
 class GmailProviderUtil {
   public static async getProfile(accessToken: string): Promise<GmailProfile> {
     return GmailProviderUtil.fetchJson<GmailProfile>('https://gmail.googleapis.com/gmail/v1/users/me/profile', accessToken);
   }
 
-  public static async watchInbox(accessToken: string, topicName: string): Promise<GmailWatchResult> {
+  public static async listLabels(accessToken: string): Promise<GmailLabel[]> {
+    const data = await GmailProviderUtil.fetchJson<{ labels?: GmailLabel[] | undefined }>(
+      'https://gmail.googleapis.com/gmail/v1/users/me/labels',
+      accessToken,
+    );
+    return (data.labels || []).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  public static async watchInbox(accessToken: string, topicName: string, labelIds?: string[]): Promise<GmailWatchResult> {
     const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/watch', {
       method: 'POST',
       headers: {
@@ -38,7 +52,7 @@ class GmailProviderUtil {
       },
       body: JSON.stringify({
         topicName,
-        labelIds: ['INBOX'],
+        labelIds: labelIds && labelIds.length > 0 ? labelIds : ['INBOX'],
         labelFilterBehavior: 'INCLUDE',
       }),
     });
@@ -62,15 +76,16 @@ class GmailProviderUtil {
     }
   }
 
-  public static async listMessageIdsSince(accessToken: string, startHistoryId: string): Promise<GmailHistoryResult> {
+  public static async listMessageIdsSince(accessToken: string, startHistoryId: string, labelIds?: string[]): Promise<GmailHistoryResult> {
     const messageIds: Set<string> = new Set<string>();
     let pageToken: string | undefined;
     let currentHistoryId = startHistoryId;
+    const singleLabelId: string = labelIds && labelIds.length === 1 ? labelIds[0] : ((!labelIds || labelIds.length === 0) ? 'INBOX' : '');
     do {
       const url: URL = new URL('https://gmail.googleapis.com/gmail/v1/users/me/history');
       url.searchParams.set('startHistoryId', startHistoryId);
       url.searchParams.set('historyTypes', 'messageAdded');
-      url.searchParams.set('labelId', 'INBOX');
+      if (singleLabelId) url.searchParams.set('labelId', singleLabelId);
       url.searchParams.set('maxResults', '500');
       if (pageToken) url.searchParams.set('pageToken', pageToken);
       const data = await GmailProviderUtil.fetchJson<GmailHistoryListResponse>(url.toString(), accessToken);
@@ -180,4 +195,4 @@ interface GmailHistoryListResponse {
 }
 
 export { GmailProviderUtil };
-export type { GmailHistoryResult, GmailMessage, GmailProfile, GmailWatchResult };
+export type { GmailHistoryResult, GmailLabel, GmailMessage, GmailProfile, GmailWatchResult };

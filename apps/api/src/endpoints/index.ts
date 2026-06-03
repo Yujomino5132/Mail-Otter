@@ -10,6 +10,8 @@ import { DeleteApplicationContextDocumentsRoute as OriginalDeleteApplicationCont
 import { ListApplicationContextDocumentsRoute as OriginalListApplicationContextDocumentsRoute } from './user/application/context/documents/GET';
 import { ListApplicationContextDeletionRunsRoute as OriginalListApplicationContextDeletionRunsRoute } from './user/application/context/deletions/GET';
 import { GetApplicationContextDocumentProviderLinkRoute as OriginalGetApplicationContextDocumentProviderLinkRoute } from './user/application/context/document/provider-link/GET';
+import { GetApplicationFoldersRoute as OriginalGetApplicationFoldersRoute } from './user/application/folders/GET';
+import { UpdateApplicationWatchSettingsRoute as OriginalUpdateApplicationWatchSettingsRoute } from './user/application/watch-settings/PUT';
 import { CreateOAuth2AuthorizationRoute as OriginalCreateOAuth2AuthorizationRoute } from './user/application/oauth2/authorize/POST';
 import { StartApplicationWatchRoute as OriginalStartApplicationWatchRoute } from './user/application/watch/POST';
 import { StopApplicationWatchRoute as OriginalStopApplicationWatchRoute } from './user/application/stop/POST';
@@ -28,6 +30,8 @@ export const DeleteApplicationContextDocumentsRoute: any = OriginalDeleteApplica
 export const ListApplicationContextDocumentsRoute: any = OriginalListApplicationContextDocumentsRoute;
 export const ListApplicationContextDeletionRunsRoute: any = OriginalListApplicationContextDeletionRunsRoute;
 export const GetApplicationContextDocumentProviderLinkRoute: any = OriginalGetApplicationContextDocumentProviderLinkRoute;
+export const GetApplicationFoldersRoute: any = OriginalGetApplicationFoldersRoute;
+export const UpdateApplicationWatchSettingsRoute: any = OriginalUpdateApplicationWatchSettingsRoute;
 export const CreateOAuth2AuthorizationRoute: any = OriginalCreateOAuth2AuthorizationRoute;
 export const StartApplicationWatchRoute: any = OriginalStartApplicationWatchRoute;
 export const StopApplicationWatchRoute: any = OriginalStopApplicationWatchRoute;

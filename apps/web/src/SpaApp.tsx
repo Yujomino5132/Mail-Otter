@@ -54,6 +54,8 @@ export default function SpaApp() {
   const [contextDeletionRuns, setContextDeletionRuns] = useState<ApplicationContextDeletionRun[]>([]);
   const [contextDeletionRunsCursor, setContextDeletionRunsCursor] = useState<string | undefined>();
   const [confirmDelete, setConfirmDelete] = useState<{ applicationId: string; displayName: string } | null>(null);
+  const [availableFolders, setAvailableFolders] = useState<Array<{ id: string; name: string }> | null>(null);
+  const [loadingFolders, setLoadingFolders] = useState(false);
 
   useEffect(() => {
     if (!confirmDelete) return;
@@ -67,6 +69,11 @@ export default function SpaApp() {
       window.removeEventListener('resize', close);
     };
   }, [confirmDelete]);
+
+  useEffect(() => {
+    setAvailableFolders(null);
+    setLoadingFolders(false);
+  }, [selectedApplicationId]);
 
   const selectedApplication = useMemo(
     () => applications.find((application) => application.applicationId === selectedApplicationId),
@@ -273,6 +280,40 @@ export default function SpaApp() {
       if (activeView === 'context') await loadContextAudit();
     } catch (error) {
       showNotice('error', error instanceof Error ? error.message : 'Unable to update context setting.');
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const loadFolders = async (applicationId: string) => {
+    setLoadingFolders(true);
+    try {
+      const data = await readJson<{ folders: Array<{ id: string; name: string }> }>(
+        await fetch(`/user/application/folders?applicationId=${encodeURIComponent(applicationId)}`),
+      );
+      setAvailableFolders(data.folders);
+    } catch (error) {
+      showNotice('error', error instanceof Error ? error.message : 'Unable to load folders.');
+    } finally {
+      setLoadingFolders(false);
+    }
+  };
+
+  const updateWatchedFolderIds = async (applicationId: string, folderIds: string[] | null) => {
+    setIsBusy(true);
+    try {
+      const data = await readJson<{ application: ConnectedApplication }>(
+        await fetch('/user/application/watch-settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ applicationId, folderIds }),
+        }),
+      );
+      setApplications((current) =>
+        current.map((application) => (application.applicationId === data.application.applicationId ? data.application : application)),
+      );
+    } catch (error) {
+      showNotice('error', error instanceof Error ? error.message : 'Unable to update watch folders.');
     } finally {
       setIsBusy(false);
     }
@@ -566,6 +607,57 @@ export default function SpaApp() {
                       Delete Indexed Documents
                     </button>
                   </div>
+                </div>
+
+                <div className="rounded-md border border-[#2d3745] bg-[#171c25] p-5">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <h2 className="text-xl font-semibold">Watch Folders</h2>
+                    <button
+                      className="px-3 py-1.5 rounded-md bg-[#2d3745] hover:bg-[#3b4655] text-sm disabled:opacity-50"
+                      onClick={() => loadFolders(selectedApplication.applicationId)}
+                      disabled={isBusy || loadingFolders || selectedApplication.status !== 'connected'}
+                    >
+                      {loadingFolders ? 'Loading…' : 'Load Folders'}
+                    </button>
+                  </div>
+                  {availableFolders ? (
+                    availableFolders.length === 0 ? (
+                      <p className="text-sm text-[#aab4c2]">No folders found.</p>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {availableFolders.map((folder) => {
+                          const isOutlook = selectedApplication.providerId === 'microsoft-outlook';
+                          const checked = selectedApplication.watchedFolderIds?.includes(folder.id) ?? false;
+                          return (
+                            <label key={folder.id} className="inline-flex items-center gap-3 text-sm text-[#d1d5db]">
+                              <input
+                                type={isOutlook ? 'radio' : 'checkbox'}
+                                name={isOutlook ? `watch-folder-${selectedApplication.applicationId}` : undefined}
+                                checked={checked}
+                                onChange={() => {
+                                  const next = isOutlook
+                                    ? checked ? [] : [folder.id]
+                                    : checked
+                                      ? (selectedApplication.watchedFolderIds || []).filter((id) => id !== folder.id)
+                                      : [...(selectedApplication.watchedFolderIds || []), folder.id];
+                                  updateWatchedFolderIds(selectedApplication.applicationId, next.length > 0 ? next : null);
+                                }}
+                                disabled={isBusy}
+                                className="h-4 w-4 accent-[#0d9488]"
+                              />
+                              {folder.name}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )
+                  ) : selectedApplication.watchedFolderIds && selectedApplication.watchedFolderIds.length > 0 ? (
+                    <p className="text-sm text-[#aab4c2]">
+                      Watching: {selectedApplication.watchedFolderIds.join(', ')} — click &quot;Load Folders&quot; to change.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-[#aab4c2]">Watching default folder (Inbox). Click &quot;Load Folders&quot; to customize.</p>
+                  )}
                 </div>
               </>
             ) : (

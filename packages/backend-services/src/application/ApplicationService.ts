@@ -85,6 +85,24 @@ class ApplicationService {
     return ApplicationResponseUtil.decorateApplication(application, env, raw);
   }
 
+  public static async updateWatchedFolderIds(
+    userEmail: string,
+    input: UpdateWatchedFolderIdsInput,
+    env: ApplicationServiceEnv,
+    raw: Request,
+  ): Promise<ApplicationResponse> {
+    const applicationDAO: ConnectedApplicationDAO = await ApplicationService.createApplicationDAO(env);
+    const application: ConnectedApplicationMetadata | undefined = await applicationDAO.updateWatchedFolderIdsForUser(
+      input.applicationId,
+      userEmail,
+      input.folderIds,
+    );
+    if (!application) {
+      throw new BadRequestError('Connected application was not found.');
+    }
+    return ApplicationResponseUtil.decorateApplication(application, env, raw);
+  }
+
   public static async deleteUserApplication(userEmail: string, applicationId: string, env: DeleteUserApplicationEnv): Promise<void> {
     const masterKey: string = await env.AES_ENCRYPTION_KEY_SECRET.get();
     const applicationDAO = new ConnectedApplicationDAO(env.DB, masterKey);
@@ -130,5 +148,16 @@ interface DeleteUserApplicationEnv extends ApplicationServiceEnv {
   OAUTH2_TOKEN_CACHE: KVNamespace;
 }
 
+interface UpdateWatchedFolderIdsInput {
+  applicationId: string;
+  folderIds: string[] | null;
+}
+
 export { ApplicationService };
-export type { ApplicationServiceEnv, CreateUserApplicationInput, DeleteUserApplicationEnv, UpdateUserApplicationInput };
+export type {
+  ApplicationServiceEnv,
+  CreateUserApplicationInput,
+  DeleteUserApplicationEnv,
+  UpdateUserApplicationInput,
+  UpdateWatchedFolderIdsInput,
+};

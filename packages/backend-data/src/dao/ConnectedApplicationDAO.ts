@@ -74,7 +74,7 @@ class ConnectedApplicationDAO {
     const rows: ConnectedApplicationInternal[] = await this.database
       .prepare(
         `
-          SELECT application_id, user_email, provider_email, display_name, provider_id, connection_method, encrypted_credentials, credentials_iv, status, context_indexing_enabled, gmail_pubsub_topic_name, created_at, updated_at
+          SELECT application_id, user_email, provider_email, display_name, provider_id, connection_method, encrypted_credentials, credentials_iv, status, context_indexing_enabled, gmail_pubsub_topic_name, watched_folder_ids, created_at, updated_at
           FROM connected_applications
           WHERE user_email = ?
           ORDER BY updated_at DESC, created_at DESC
@@ -227,6 +227,28 @@ class ConnectedApplicationDAO {
     return this.getMetadataByIdForUser(applicationId, userEmail);
   }
 
+  public async updateWatchedFolderIdsForUser(
+    applicationId: string,
+    userEmail: string,
+    folderIds: string[] | null,
+  ): Promise<ConnectedApplicationMetadata | undefined> {
+    const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    const result: D1Result = await this.database
+      .prepare(
+        `
+          UPDATE connected_applications
+          SET watched_folder_ids = ?, updated_at = ?
+          WHERE application_id = ? AND user_email = ?
+        `,
+      )
+      .bind(folderIds ? JSON.stringify(folderIds) : null, now, applicationId, userEmail)
+      .run();
+    if (!result.success) {
+      throw new DatabaseError(`Failed to update watched folder IDs: ${result.error}`);
+    }
+    return this.getMetadataByIdForUser(applicationId, userEmail);
+  }
+
   public async deleteForUser(applicationId: string, userEmail: string): Promise<void> {
     const result: D1Result = await this.database
       .prepare('DELETE FROM connected_applications WHERE application_id = ? AND user_email = ?')
@@ -243,7 +265,7 @@ class ConnectedApplicationDAO {
     const row: ConnectedApplicationInternal | null = await this.database
       .prepare(
         `
-          SELECT application_id, user_email, provider_email, display_name, provider_id, connection_method, encrypted_credentials, credentials_iv, status, context_indexing_enabled, gmail_pubsub_topic_name, created_at, updated_at
+          SELECT application_id, user_email, provider_email, display_name, provider_id, connection_method, encrypted_credentials, credentials_iv, status, context_indexing_enabled, gmail_pubsub_topic_name, watched_folder_ids, created_at, updated_at
           FROM connected_applications
           WHERE application_id = ?${whereUser}
           LIMIT 1
@@ -279,6 +301,7 @@ class ConnectedApplicationDAO {
       status,
       contextIndexingEnabled: row.context_indexing_enabled !== 0,
       gmailPubsubTopicName: row.gmail_pubsub_topic_name,
+      watchedFolderIds: row.watched_folder_ids ? (JSON.parse(row.watched_folder_ids) as string[]) : null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

@@ -5,6 +5,11 @@ interface OutlookMailboxProfile {
   emailAddress: string;
 }
 
+interface OutlookMailFolder {
+  id: string;
+  displayName: string;
+}
+
 interface OutlookSubscriptionResult {
   id: string;
   expiresAt: number;
@@ -28,6 +33,14 @@ class OutlookProviderUtil {
     /erroritemnotfound/i,
   ];
 
+  public static async listMailFolders(accessToken: string): Promise<OutlookMailFolder[]> {
+    const data = await OutlookProviderUtil.fetchJson<{ value?: OutlookMailFolder[] | undefined }>(
+      'https://graph.microsoft.com/v1.0/me/mailFolders?$select=id,displayName&$top=100',
+      accessToken,
+    );
+    return data.value || [];
+  }
+
   public static async getProfile(accessToken: string): Promise<OutlookMailboxProfile> {
     const data = await OutlookProviderUtil.fetchJson<{
       mail?: string | null | undefined;
@@ -44,8 +57,9 @@ class OutlookProviderUtil {
     lifecycleNotificationUrl: string,
     clientState: string,
     expiresAt: number,
+    folderId?: string,
   ): Promise<OutlookSubscriptionResult> {
-    const resource = "/me/mailFolders('Inbox')/messages";
+    const resource = `/me/mailFolders('${folderId ?? 'Inbox'}')/messages`;
     const data = await OutlookProviderUtil.fetchJson<{
       id?: string | undefined;
       expirationDateTime?: string | undefined;
@@ -212,4 +226,4 @@ class OutlookProviderUtil {
 }
 
 export { OutlookProviderUtil };
-export type { OutlookMailboxProfile, OutlookMessage, OutlookSubscriptionResult };
+export type { OutlookMailboxProfile, OutlookMailFolder, OutlookMessage, OutlookSubscriptionResult };

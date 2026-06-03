@@ -52,7 +52,7 @@ class SubscriptionRenewalUtil {
     const application: ConnectedApplication | undefined = await applicationDAO.getById(subscription.applicationId);
     if (!application || !application.gmailPubsubTopicName) return;
     const accessToken: string = await OAuth2AccessTokenService.getAccessToken(application.applicationId, _env);
-    const watch = await GmailProviderUtil.watchInbox(accessToken, application.gmailPubsubTopicName);
+    const watch = await GmailProviderUtil.watchInbox(accessToken, application.gmailPubsubTopicName, application.watchedFolderIds ?? undefined);
     await subscriptionDAO.upsertActive({
       applicationId: application.applicationId,
       providerId: application.providerId,
