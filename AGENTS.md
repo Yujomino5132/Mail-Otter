@@ -51,6 +51,7 @@ volta run pnpm run typecheck
 volta run pnpm run test
 volta run pnpm run build
 volta run pnpm run lint
+volta run pnpm run checks
 volta run pnpm run deploy
 volta run pnpm run cf-typegen
 ```
