@@ -40,6 +40,18 @@ class EmailSummaryUtil {
     body: string,
     ragContext?: string | undefined,
   ): Promise<string> {
+    const result: EmailSummaryResult = await EmailSummaryUtil.summarizeEmailWithUsage(ai, model, subject, from, body, ragContext);
+    return result.summary;
+  }
+
+  public static async summarizeEmailWithUsage(
+    ai: Ai,
+    model: string,
+    subject: string,
+    from: string,
+    body: string,
+    ragContext?: string | undefined,
+  ): Promise<EmailSummaryResult> {
     const instructions = [
       'You are a helpful assistant that summarizes emails for a mailbox owner.',
       'Return only JSON with this exact shape: {"gist":"one sentence","keyDetails":["short fact"],"actionItems":["owner deadline or request"]}.',
@@ -78,6 +90,7 @@ class EmailSummaryUtil {
     }
 
     const result = await (ai as unknown as { run: (...args: unknown[]) => Promise<unknown> }).run(model, request);
+    const usage: AiTextGenerationUsage | undefined = EmailSummaryUtil.extractUsage(result);
 
     const summaryText = EmailSummaryUtil.extractResponseText(result);
     if (!summaryText) {
@@ -88,7 +101,7 @@ class EmailSummaryUtil {
     if (!summary) {
       throw new AiSummaryRetryableError('Workers AI did not return a valid summary.');
     }
-    return EmailSummaryUtil.renderSummary(summary);
+    return { summary: EmailSummaryUtil.renderSummary(summary), usage };
   }
 
   private static supportsJsonMode(model: string): boolean {
@@ -131,6 +144,18 @@ class EmailSummaryUtil {
     }
 
     return undefined;
+  }
+
+  private static extractUsage(result: unknown): AiTextGenerationUsage | undefined {
+    if (!EmailSummaryUtil.isRecord(result) || !EmailSummaryUtil.isRecord(result.usage)) return undefined;
+
+    const promptTokens: number | undefined = EmailSummaryUtil.getOptionalNumber(result.usage.prompt_tokens ?? result.usage.input_tokens);
+    const completionTokens: number | undefined = EmailSummaryUtil.getOptionalNumber(
+      result.usage.completion_tokens ?? result.usage.output_tokens,
+    );
+    const totalTokens: number | undefined = EmailSummaryUtil.getOptionalNumber(result.usage.total_tokens);
+    if (promptTokens === undefined && completionTokens === undefined && totalTokens === undefined) return undefined;
+    return { promptTokens, completionTokens, totalTokens };
   }
 
   static parseAiSummaryResult(result: string): EmailSummary | undefined {
@@ -306,6 +331,10 @@ class EmailSummaryUtil {
     return Boolean(value && typeof value === 'object' && !Array.isArray(value));
   }
 
+  private static getOptionalNumber(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  }
+
   private static isEmailSummary(value: unknown): value is EmailSummary {
     if (!value || typeof value !== 'object') return false;
     const candidate = value as Record<string, unknown>;
@@ -325,6 +354,17 @@ interface EmailSummary {
   actionItems: string[];
 }
 
+interface EmailSummaryResult {
+  summary: string;
+  usage?: AiTextGenerationUsage | undefined;
+}
+
+interface AiTextGenerationUsage {
+  promptTokens?: number | undefined;
+  completionTokens?: number | undefined;
+  totalTokens?: number | undefined;
+}
+
 interface AiTextGenerationRequest {
   messages: Array<{ role: 'system' | 'user'; content: string }>;
   max_tokens: number;
@@ -338,4 +378,4 @@ interface AiTextGenerationRequest {
 }
 
 export { EmailSummaryUtil };
-export type { EmailSummary };
+export type { AiTextGenerationUsage, EmailSummary, EmailSummaryResult };

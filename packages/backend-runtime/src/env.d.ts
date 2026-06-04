@@ -16,6 +16,8 @@ declare global {
     MAX_APPLICATIONS_PER_USER?: string | undefined;
     OAUTH2_STATE_EXPIRY_MINUTES?: string | undefined;
     AI_SUMMARY_MODEL?: string | undefined;
+    AI_SUMMARY_FALLBACK_MODEL?: string | undefined;
+    AI_DAILY_NEURON_FALLBACK_THRESHOLD?: string | undefined;
     AI_EMBEDDING_MODEL?: string | undefined;
     MAX_EMAIL_BODY_CHARS?: string | undefined;
     MAX_CONTEXT_MEMORY_CHARS?: string | undefined;

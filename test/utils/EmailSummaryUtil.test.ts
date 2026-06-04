@@ -133,4 +133,31 @@ Action items:
 
 <Mail-Otter Summary>`);
   });
+
+  it('returns token usage with summarized email output when available', async () => {
+    const ai = {
+      run: vi.fn().mockResolvedValue({
+        response: JSON.stringify({
+          gist: 'The email asks for feedback.',
+          keyDetails: ['Review is due Tuesday.'],
+          actionItems: ['Send feedback by Tuesday.'],
+        }),
+        usage: {
+          prompt_tokens: 1000,
+          completion_tokens: 100,
+          total_tokens: 1100,
+        },
+      }),
+    } as unknown as Ai;
+
+    await expect(EmailSummaryUtil.summarizeEmailWithUsage(ai, '@cf/openai/gpt-oss-120b', 'Review', 'sam@example.com', 'body')).resolves
+      .toMatchObject({
+        summary: expect.stringContaining('Gist: The email asks for feedback.'),
+        usage: {
+          promptTokens: 1000,
+          completionTokens: 100,
+          totalTokens: 1100,
+        },
+      });
+  });
 });

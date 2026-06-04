@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EmailProcessingUtil, EmailSummaryUtil } from '@mail-otter/backend-services/email';
 import type { EmailProcessingEnv } from '@mail-otter/backend-services/email';
-import { ConnectedApplicationDAO, ProcessedMessageDAO } from '@mail-otter/backend-data/dao';
+import { AiDailyUsageDAO, ConnectedApplicationDAO, ProcessedMessageDAO } from '@mail-otter/backend-data/dao';
 import { OutlookProviderUtil } from '@mail-otter/provider-clients/outlook';
 import type { OutlookMessage } from '@mail-otter/provider-clients/outlook';
 import { NonRetryableError, RetryableError } from '@mail-otter/backend-errors';
@@ -85,7 +85,7 @@ describe('EmailProcessingUtil', () => {
 
     it('skips moved Outlook messages when the stable internet message id was already processed', async () => {
       const tryStart = vi.spyOn(ProcessedMessageDAO.prototype, 'tryStart').mockResolvedValue(false);
-      const summarizeEmail = vi.spyOn(EmailSummaryUtil, 'summarizeEmail').mockResolvedValue('Summary text');
+      const summarizeEmail = vi.spyOn(EmailSummaryUtil, 'summarizeEmailWithUsage').mockResolvedValue({ summary: 'Summary text' });
       const sendSelfSummaryReply = vi.spyOn(OutlookProviderUtil, 'sendSelfSummaryReply').mockResolvedValue();
       vi.spyOn(OutlookProviderUtil, 'getMessage').mockResolvedValue(
         createOutlookMessage({ id: 'moved-message-2', conversationId: 'conversation-1', internetMessageId: '<original@example.com>' }),
@@ -107,7 +107,7 @@ describe('EmailProcessingUtil', () => {
       const tryStart = vi.spyOn(ProcessedMessageDAO.prototype, 'tryStart').mockResolvedValue(true);
       const markSummarized = vi.spyOn(ProcessedMessageDAO.prototype, 'markSummarized').mockResolvedValue();
       vi.spyOn(ProcessedMessageDAO.prototype, 'markError').mockResolvedValue();
-      const summarizeEmail = vi.spyOn(EmailSummaryUtil, 'summarizeEmail').mockResolvedValue('Summary text');
+      const summarizeEmail = vi.spyOn(EmailSummaryUtil, 'summarizeEmailWithUsage').mockResolvedValue({ summary: 'Summary text' });
       const sendSelfSummaryReply = vi.spyOn(OutlookProviderUtil, 'sendSelfSummaryReply').mockResolvedValue();
       vi.spyOn(OutlookProviderUtil, 'getMessage').mockResolvedValue(
         createOutlookMessage({ id: 'reply-message-2', conversationId: 'conversation-1', internetMessageId: '<reply-2@example.com>' }),
@@ -124,6 +124,95 @@ describe('EmailProcessingUtil', () => {
       expect(summarizeEmail).toHaveBeenCalledOnce();
       expect(sendSelfSummaryReply).toHaveBeenCalledOnce();
       expect(markSummarized).toHaveBeenCalledWith('app-1', 'reply-message-2');
+    });
+
+    it('uses the primary summary model while the daily neuron estimate is below the fallback threshold', async () => {
+      vi.spyOn(ProcessedMessageDAO.prototype, 'tryStart').mockResolvedValue(true);
+      vi.spyOn(ProcessedMessageDAO.prototype, 'markSummarized').mockResolvedValue();
+      vi.spyOn(ProcessedMessageDAO.prototype, 'markError').mockResolvedValue();
+      vi.spyOn(OutlookProviderUtil, 'sendSelfSummaryReply').mockResolvedValue();
+      vi.spyOn(OutlookProviderUtil, 'getMessage').mockResolvedValue(createOutlookMessage());
+      vi.spyOn(AiDailyUsageDAO.prototype, 'getEstimatedNeuronsForDate').mockResolvedValue(8000);
+      const incrementUsage = vi.spyOn(AiDailyUsageDAO.prototype, 'incrementUsage').mockResolvedValue();
+      const summarizeEmail = vi.spyOn(EmailSummaryUtil, 'summarizeEmailWithUsage').mockResolvedValue({
+        summary: 'Summary text',
+        usage: { promptTokens: 1000, completionTokens: 100 },
+      });
+
+      await EmailProcessingUtil.processOutlookMessage(
+        createApplication(),
+        'access-token',
+        'message-1',
+        createEnv({ AI_DAILY_NEURON_FALLBACK_THRESHOLD: '9000' }),
+        [],
+      );
+
+      expect(summarizeEmail).toHaveBeenCalledWith(
+        expect.anything(),
+        '@cf/openai/gpt-oss-120b',
+        'Project update',
+        'sender@example.com',
+        'Please review the project update.',
+        undefined,
+      );
+      expect(incrementUsage).toHaveBeenCalledWith({
+        usageDate: expect.any(String),
+        estimatedNeurons: 39,
+        promptTokens: 1000,
+        completionTokens: 100,
+      });
+    });
+
+    it('uses the fallback summary model after the daily neuron estimate reaches the threshold', async () => {
+      vi.spyOn(ProcessedMessageDAO.prototype, 'tryStart').mockResolvedValue(true);
+      vi.spyOn(ProcessedMessageDAO.prototype, 'markSummarized').mockResolvedValue();
+      vi.spyOn(ProcessedMessageDAO.prototype, 'markError').mockResolvedValue();
+      vi.spyOn(OutlookProviderUtil, 'sendSelfSummaryReply').mockResolvedValue();
+      vi.spyOn(OutlookProviderUtil, 'getMessage').mockResolvedValue(createOutlookMessage());
+      vi.spyOn(AiDailyUsageDAO.prototype, 'getEstimatedNeuronsForDate').mockResolvedValue(9000);
+      const incrementUsage = vi.spyOn(AiDailyUsageDAO.prototype, 'incrementUsage').mockResolvedValue();
+      const summarizeEmail = vi.spyOn(EmailSummaryUtil, 'summarizeEmailWithUsage').mockResolvedValue({
+        summary: 'Summary text',
+        usage: { promptTokens: 1000, completionTokens: 100 },
+      });
+
+      await EmailProcessingUtil.processOutlookMessage(
+        createApplication(),
+        'access-token',
+        'message-1',
+        createEnv({ AI_DAILY_NEURON_FALLBACK_THRESHOLD: '9000' }),
+        [],
+      );
+
+      expect(summarizeEmail).toHaveBeenCalledWith(
+        expect.anything(),
+        '@cf/openai/gpt-oss-20b',
+        'Project update',
+        'sender@example.com',
+        'Please review the project update.',
+        undefined,
+      );
+      expect(incrementUsage).toHaveBeenCalledWith({
+        usageDate: expect.any(String),
+        estimatedNeurons: 21,
+        promptTokens: 1000,
+        completionTokens: 100,
+      });
+    });
+
+    it('classifies Workers AI free allocation exhaustion as non-retryable', async () => {
+      vi.spyOn(ProcessedMessageDAO.prototype, 'tryStart').mockResolvedValue(true);
+      const markError = vi.spyOn(ProcessedMessageDAO.prototype, 'markError').mockResolvedValue();
+      vi.spyOn(OutlookProviderUtil, 'getMessage').mockResolvedValue(createOutlookMessage());
+      vi.spyOn(EmailSummaryUtil, 'summarizeEmailWithUsage').mockRejectedValue(
+        new Error('Account limited 3036: You have used up your daily free allocation of 10,000 neurons.'),
+      );
+
+      await expect(
+        EmailProcessingUtil.processOutlookMessage(createApplication(), 'access-token', 'message-1', createEnv(), []),
+      ).rejects.toThrow(NonRetryableError);
+
+      expect(markError).toHaveBeenCalledWith('app-1', 'message-1', 'Workers AI daily free allocation was exceeded.');
     });
   });
 });
@@ -160,7 +249,7 @@ function createOutlookMessage(overrides: Partial<OutlookMessage> = {}): OutlookM
   };
 }
 
-function createEnv(): EmailProcessingEnv {
+function createEnv(overrides: Partial<EmailProcessingEnv> = {}): EmailProcessingEnv {
   return {
     DB: {} as D1Database,
     AES_ENCRYPTION_KEY_SECRET: {
@@ -169,5 +258,7 @@ function createEnv(): EmailProcessingEnv {
     OAUTH2_TOKEN_CACHE: {} as KVNamespace,
     OAUTH2_TOKEN_REFRESHERS: {} as DurableObjectNamespace,
     AI: {} as Ai,
+    AI_DAILY_NEURON_FALLBACK_THRESHOLD: '0',
+    ...overrides,
   };
 }

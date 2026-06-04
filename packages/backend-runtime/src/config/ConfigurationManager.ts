@@ -1,5 +1,7 @@
 import {
+  DEFAULT_AI_DAILY_NEURON_FALLBACK_THRESHOLD,
   DEFAULT_AI_EMBEDDING_MODEL,
+  DEFAULT_EMAIL_SUMMARY_FALLBACK_MODEL,
   DEFAULT_EMAIL_SUMMARY_MODEL,
   DEFAULT_GMAIL_WATCH_RENEWAL_WINDOW_HOURS,
   DEFAULT_MAX_APPLICATIONS_PER_USER,
@@ -48,6 +50,18 @@ class ConfigurationManager {
 
   public static getEmailSummaryModel(env: unknown): string {
     return ConfigurationManager.getString(env, 'AI_SUMMARY_MODEL', DEFAULT_EMAIL_SUMMARY_MODEL);
+  }
+
+  public static getEmailSummaryFallbackModel(env: unknown): string {
+    return ConfigurationManager.getString(env, 'AI_SUMMARY_FALLBACK_MODEL', DEFAULT_EMAIL_SUMMARY_FALLBACK_MODEL);
+  }
+
+  public static getAiDailyNeuronFallbackThreshold(env: unknown): number {
+    return ConfigurationManager.getNonNegativeInt(
+      env,
+      'AI_DAILY_NEURON_FALLBACK_THRESHOLD',
+      DEFAULT_AI_DAILY_NEURON_FALLBACK_THRESHOLD,
+    );
   }
 
   public static getMaxEmailBodyChars(env: unknown): number {
@@ -123,6 +137,13 @@ class ConfigurationManager {
     const value = (env as any)[key] as string | undefined;
     const parsed = Number(value ?? defaultValue);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : Number(defaultValue);
+  }
+
+  private static getNonNegativeInt(env: unknown, key: string, defaultValue: string): number {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const value = (env as any)[key] as string | undefined;
+    const parsed = Number(value ?? defaultValue);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : Number(defaultValue);
   }
 
   private static getString(env: unknown, key: string, defaultValue: string): string {

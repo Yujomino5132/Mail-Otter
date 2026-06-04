@@ -1,8 +1,9 @@
-import { ApplicationContextDAO } from '@mail-otter/backend-data/dao';
+import { AiDailyUsageDAO, ApplicationContextDAO } from '@mail-otter/backend-data/dao';
 import { EmailContentUtil } from '@mail-otter/provider-clients/email-content';
 import type { ApplicationContextDocument, ConnectedApplication } from '@mail-otter/shared/model';
 import { CryptoUtil } from '@mail-otter/shared/utils';
 import { ConfigurationManager } from '@mail-otter/backend-runtime/config';
+import { AiUsageUtil, type AiEmbeddingUsageEstimate } from './AiUsageUtil';
 
 class EmailContextUtil {
   public static async getUserVectorNamespace(userEmail: string): Promise<string> {
@@ -36,11 +37,9 @@ class EmailContextUtil {
     }
 
     try {
-      const embedding: number[] = await EmailContextUtil.embed(
-        input.env.AI,
-        ConfigurationManager.getAiEmbeddingModel(input.env),
-        indexedText,
-      );
+      const embeddingModel: string = ConfigurationManager.getAiEmbeddingModel(input.env);
+      const embedding: number[] = await EmailContextUtil.embed(input.env.AI, embeddingModel, indexedText);
+      await EmailContextUtil.recordEmbeddingUsage(input.env, embeddingModel, indexedText);
       const ragContext: string | undefined = shouldRetrieve
         ? await EmailContextUtil.queryRelevantContext(input.env, embedding, vectorNamespace, enabledApplicationIds, document?.vectorId)
         : undefined;
@@ -120,6 +119,19 @@ class EmailContextUtil {
       throw new Error('Workers AI did not return an embedding vector.');
     }
     return embedding;
+  }
+
+  private static async recordEmbeddingUsage(env: EmailContextEnv, model: string, text: string): Promise<void> {
+    try {
+      const estimate: AiEmbeddingUsageEstimate = AiUsageUtil.estimateEmbeddingUsage(model, text);
+      await new AiDailyUsageDAO(env.DB).incrementUsage({
+        usageDate: AiUsageUtil.getCurrentUtcUsageDate(),
+        estimatedNeurons: estimate.estimatedNeurons,
+        embeddingTokens: estimate.embeddingTokens,
+      });
+    } catch (error: unknown) {
+      console.warn('Failed to record Workers AI embedding usage estimate:', error);
+    }
   }
 
   private static async queryRelevantContext(

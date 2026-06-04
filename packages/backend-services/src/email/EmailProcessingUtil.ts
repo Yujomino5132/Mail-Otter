@@ -1,5 +1,5 @@
 import { PROVIDER_SUBSCRIPTION_STATUS_ACTIVE } from '@mail-otter/shared/constants';
-import { ConnectedApplicationDAO, ProcessedMessageDAO, ProviderSubscriptionDAO } from '@mail-otter/backend-data/dao';
+import { AiDailyUsageDAO, ConnectedApplicationDAO, ProcessedMessageDAO, ProviderSubscriptionDAO } from '@mail-otter/backend-data/dao';
 import { EmailContentUtil } from '@mail-otter/provider-clients/email-content';
 import { GmailProviderUtil } from '@mail-otter/provider-clients/gmail';
 import { OutlookProviderUtil } from '@mail-otter/provider-clients/outlook';
@@ -11,8 +11,11 @@ import { ConfigurationManager } from '@mail-otter/backend-runtime/config';
 import { CryptoUtil } from '@mail-otter/shared/utils';
 import type { ProviderId } from '@mail-otter/shared/constants';
 import { EmailContextUtil } from './EmailContextUtil';
-import { EmailSummaryUtil } from './EmailSummaryUtil';
+import { EmailSummaryUtil, type EmailSummaryResult } from './EmailSummaryUtil';
+import { AiUsageUtil, type AiTextGenerationUsageEstimate } from './AiUsageUtil';
 import { OAuth2AccessTokenService } from '../oauth2/OAuth2AccessTokenService';
+
+const EMAIL_SUMMARY_MAX_COMPLETION_TOKENS = 512;
 
 class EmailProcessingUtil {
   public static async resolveApplication(message: EmailQueueMessage, env: EmailProcessingEnv): Promise<ResolvedApplication> {
@@ -192,7 +195,56 @@ class EmailProcessingUtil {
   ): Promise<string> {
     const maxChars: number = ConfigurationManager.getMaxEmailBodyChars(env);
     const input: string = EmailContentUtil.truncate(body || '(empty message body)', maxChars);
-    return EmailSummaryUtil.summarizeEmail(env.AI, ConfigurationManager.getEmailSummaryModel(env), subject, from, input, ragContext);
+    const model: string = await EmailProcessingUtil.resolveSummaryModel(env, input);
+    const result: EmailSummaryResult = await EmailSummaryUtil.summarizeEmailWithUsage(env.AI, model, subject, from, input, ragContext);
+    await EmailProcessingUtil.recordSummaryUsage(env, model, result, input);
+    return result.summary;
+  }
+
+  private static async resolveSummaryModel(env: EmailProcessingEnv, fallbackInputText: string): Promise<string> {
+    const primaryModel: string = ConfigurationManager.getEmailSummaryModel(env);
+    const fallbackThreshold: number = ConfigurationManager.getAiDailyNeuronFallbackThreshold(env);
+    if (fallbackThreshold <= 0) return primaryModel;
+
+    try {
+      const usageDate: string = AiUsageUtil.getCurrentUtcUsageDate();
+      const estimatedNeurons: number = await new AiDailyUsageDAO(env.DB).getEstimatedNeuronsForDate(usageDate);
+      const projectedPrimaryUsage: AiTextGenerationUsageEstimate = AiUsageUtil.estimateTextGenerationUsageForTokenCounts(
+        primaryModel,
+        AiUsageUtil.estimateTokensFromText(fallbackInputText),
+        EMAIL_SUMMARY_MAX_COMPLETION_TOKENS,
+      );
+      return estimatedNeurons + projectedPrimaryUsage.estimatedNeurons >= fallbackThreshold
+        ? ConfigurationManager.getEmailSummaryFallbackModel(env)
+        : primaryModel;
+    } catch (error: unknown) {
+      console.warn('Failed to read Workers AI daily usage estimate:', error);
+      return primaryModel;
+    }
+  }
+
+  private static async recordSummaryUsage(
+    env: EmailProcessingEnv,
+    model: string,
+    result: EmailSummaryResult,
+    fallbackInputText: string,
+  ): Promise<void> {
+    try {
+      const estimate: AiTextGenerationUsageEstimate = AiUsageUtil.estimateTextGenerationUsage(
+        model,
+        result.usage,
+        fallbackInputText,
+        result.summary,
+      );
+      await new AiDailyUsageDAO(env.DB).incrementUsage({
+        usageDate: AiUsageUtil.getCurrentUtcUsageDate(),
+        estimatedNeurons: estimate.estimatedNeurons,
+        promptTokens: estimate.promptTokens,
+        completionTokens: estimate.completionTokens,
+      });
+    } catch (error: unknown) {
+      console.warn('Failed to record Workers AI summary usage estimate:', error);
+    }
   }
 
   private static formatError(error: unknown): string {
@@ -218,6 +270,9 @@ class EmailProcessingUtil {
     if (error instanceof RetryableError || error instanceof NonRetryableError) {
       return error;
     }
+    if (EmailProcessingUtil.isWorkersAiDailyLimitError(error)) {
+      return new NonRetryableError('Workers AI daily free allocation was exceeded.');
+    }
     if (error instanceof BadRequestError) {
       return new NonRetryableError(error.message);
     }
@@ -225,6 +280,11 @@ class EmailProcessingUtil {
       return new RetryableError(error.message);
     }
     return new RetryableError(String(error));
+  }
+
+  private static isWorkersAiDailyLimitError(error: unknown): boolean {
+    const message: string = EmailProcessingUtil.formatError(error);
+    return /3036|daily free allocation|10,?000 neurons|account limited/i.test(message);
   }
 }
 
@@ -249,6 +309,8 @@ interface EmailProcessingEnv {
   EMAIL_CONTEXT_INDEX?: Vectorize | undefined;
   OAUTH2_ACCESS_TOKEN_MIN_VALID_SECONDS?: string | undefined;
   AI_SUMMARY_MODEL?: string | undefined;
+  AI_SUMMARY_FALLBACK_MODEL?: string | undefined;
+  AI_DAILY_NEURON_FALLBACK_THRESHOLD?: string | undefined;
   AI_EMBEDDING_MODEL?: string | undefined;
   MAX_EMAIL_BODY_CHARS?: string | undefined;
   MAX_CONTEXT_MEMORY_CHARS?: string | undefined;

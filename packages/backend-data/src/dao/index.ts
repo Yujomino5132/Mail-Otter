@@ -1,4 +1,6 @@
 export { UserDAO } from './UserDAO';
+export { AiDailyUsageDAO } from './AiDailyUsageDAO';
+export type { AiDailyUsage, IncrementAiDailyUsageInput } from './AiDailyUsageDAO';
 export { ApplicationContextDAO } from './ApplicationContextDAO';
 export type { OverLimitApplication } from './ApplicationContextDAO';
 export { ConnectedApplicationDAO } from './ConnectedApplicationDAO';
