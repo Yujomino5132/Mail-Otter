@@ -123,7 +123,40 @@ describe('EmailProcessingUtil', () => {
       });
       expect(summarizeEmail).toHaveBeenCalledOnce();
       expect(sendSelfSummaryReply).toHaveBeenCalledOnce();
+      expect(sendSelfSummaryReply).toHaveBeenCalledWith('access-token', expect.anything(), 'owner@example.com', 'Summary text');
       expect(markSummarized).toHaveBeenCalledWith('app-1', 'reply-message-2');
+    });
+
+    it('appends metadata-only debug details when DEBUG_MODE is true', async () => {
+      vi.spyOn(ProcessedMessageDAO.prototype, 'tryStart').mockResolvedValue(true);
+      vi.spyOn(ProcessedMessageDAO.prototype, 'markSummarized').mockResolvedValue();
+      vi.spyOn(ProcessedMessageDAO.prototype, 'markError').mockResolvedValue();
+      vi.spyOn(OutlookProviderUtil, 'getMessage').mockResolvedValue(createOutlookMessage());
+      const sendSelfSummaryReply = vi.spyOn(OutlookProviderUtil, 'sendSelfSummaryReply').mockResolvedValue();
+      vi.spyOn(AiDailyUsageDAO.prototype, 'incrementUsage').mockResolvedValue();
+      vi.spyOn(EmailSummaryUtil, 'summarizeEmailWithUsage').mockResolvedValue({
+        summary: 'Summary text',
+        usage: { promptTokens: 1000, completionTokens: 100, totalTokens: 1100 },
+      });
+
+      await EmailProcessingUtil.processOutlookMessage(
+        createApplication(),
+        'access-token',
+        'message-1',
+        createEnv({ DEBUG_MODE: 'true' }),
+        [],
+      );
+
+      const summary: string = sendSelfSummaryReply.mock.calls[0]![3];
+      expect(summary).toMatch(/^Summary text\n\n--- Mail-Otter Debug ---/);
+      expect(summary).toContain('Provider: microsoft-outlook');
+      expect(summary).toContain('Application: app-1 (app-1)');
+      expect(summary).toContain('Model: @cf/openai/gpt-oss-120b');
+      expect(summary).toContain('Input chars: 33 / 12000');
+      expect(summary).toContain('RAG context: not used');
+      expect(summary).toContain('AI usage: prompt=1000 completion=100 total=1100 estimatedNeurons=39');
+      expect(summary).not.toContain('Please review the project update.');
+      expect(summary).not.toContain('access-token');
     });
 
     it('uses the primary summary model while the daily neuron estimate is below the fallback threshold', async () => {

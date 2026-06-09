@@ -1,6 +1,7 @@
 import {
   DEFAULT_AI_DAILY_NEURON_FALLBACK_THRESHOLD,
   DEFAULT_AI_EMBEDDING_MODEL,
+  DEFAULT_DEBUG_MODE,
   DEFAULT_EMAIL_SUMMARY_FALLBACK_MODEL,
   DEFAULT_EMAIL_SUMMARY_MODEL,
   DEFAULT_GMAIL_WATCH_RENEWAL_WINDOW_HOURS,
@@ -26,6 +27,10 @@ import {
 class ConfigurationManager {
   public static getMaxApplicationsPerUser(env: unknown): number {
     return ConfigurationManager.getPositiveInt(env, 'MAX_APPLICATIONS_PER_USER', DEFAULT_MAX_APPLICATIONS_PER_USER);
+  }
+
+  public static getDebugMode(env: unknown): boolean {
+    return ConfigurationManager.getBoolean(env, 'DEBUG_MODE', DEFAULT_DEBUG_MODE);
   }
 
   public static getOauth2StateExpiryMinutes(env: unknown): number {

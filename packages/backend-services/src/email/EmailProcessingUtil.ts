@@ -93,7 +93,7 @@ class EmailProcessingUtil {
         sourceDocumentId: message.id,
         sourceThreadId: message.threadId,
       });
-      const summary: string = await EmailProcessingUtil.summarize(env, subject, from, extracted.text, ragContext);
+      const summary: string = await EmailProcessingUtil.summarize(env, application, subject, from, extracted.text, ragContext);
       await GmailProviderUtil.sendSummaryReply(accessToken, application.providerEmail!, message, summary);
       await processedDAO.markSummarized(application.applicationId, message.id);
     } catch (error: unknown) {
@@ -177,7 +177,7 @@ class EmailProcessingUtil {
         sourceDocumentId: message.id,
         sourceThreadId: message.conversationId || null,
       });
-      const summary: string = await EmailProcessingUtil.summarize(env, subject, from, body, ragContext);
+      const summary: string = await EmailProcessingUtil.summarize(env, application, subject, from, body, ragContext);
       await OutlookProviderUtil.sendSelfSummaryReply(accessToken, message, application.providerEmail!, summary);
       await processedDAO.markSummarized(application.applicationId, message.id);
     } catch (error: unknown) {
@@ -189,17 +189,38 @@ class EmailProcessingUtil {
 
   private static async summarize(
     env: EmailProcessingEnv,
+    application: ConnectedApplication,
     subject: string,
     from: string,
     body: string,
     ragContext?: string | undefined,
   ): Promise<string> {
     const maxChars: number = ConfigurationManager.getMaxEmailBodyChars(env);
-    const input: string = EmailContentUtil.truncate(body || '(empty message body)', maxChars);
+    const bodyText: string = body || '(empty message body)';
+    const input: string = EmailContentUtil.truncate(bodyText, maxChars);
     const model: string = await EmailProcessingUtil.resolveSummaryModel(env, input);
     const result: EmailSummaryResult = await EmailSummaryUtil.summarizeEmailWithUsage(env.AI, model, subject, from, input, ragContext);
-    await EmailProcessingUtil.recordSummaryUsage(env, model, result, input);
-    return result.summary;
+    const usageEstimate: AiTextGenerationUsageEstimate | undefined = await EmailProcessingUtil.recordSummaryUsage(env, model, result, input);
+    if (!ConfigurationManager.getDebugMode(env)) return result.summary;
+
+    const applicationName: string = application.displayName || application.applicationId;
+    return [
+      result.summary,
+      '',
+      '--- Mail-Otter Debug ---',
+      `Generated at: ${new Date().toISOString()}`,
+      `Provider: ${application.providerId}`,
+      `Application: ${applicationName} (${application.applicationId})`,
+      `Model: ${model}`,
+      `Input chars: ${input.length} / ${maxChars}${bodyText.length > input.length ? ' (truncated)' : ''}`,
+      `RAG context: ${ragContext ? `used, ${ragContext.length} chars` : 'not used'}`,
+      [
+        `AI usage: prompt=${EmailProcessingUtil.formatDebugNumber(result.usage?.promptTokens)}`,
+        `completion=${EmailProcessingUtil.formatDebugNumber(result.usage?.completionTokens)}`,
+        `total=${EmailProcessingUtil.formatDebugNumber(result.usage?.totalTokens)}`,
+        `estimatedNeurons=${EmailProcessingUtil.formatDebugNumber(usageEstimate?.estimatedNeurons)}`,
+      ].join(' '),
+    ].join('\n');
   }
 
   private static async resolveSummaryModel(env: EmailProcessingEnv, fallbackInputText: string): Promise<string> {
@@ -229,9 +250,10 @@ class EmailProcessingUtil {
     model: string,
     result: EmailSummaryResult,
     fallbackInputText: string,
-  ): Promise<void> {
+  ): Promise<AiTextGenerationUsageEstimate | undefined> {
+    let estimate: AiTextGenerationUsageEstimate | undefined;
     try {
-      const estimate: AiTextGenerationUsageEstimate = AiUsageUtil.estimateTextGenerationUsage(
+      estimate = AiUsageUtil.estimateTextGenerationUsage(
         model,
         result.usage,
         fallbackInputText,
@@ -246,6 +268,11 @@ class EmailProcessingUtil {
     } catch (error: unknown) {
       console.warn('Failed to record Workers AI summary usage estimate:', error);
     }
+    return estimate;
+  }
+
+  private static formatDebugNumber(value: number | undefined): string {
+    return value === undefined ? 'unknown' : String(value);
   }
 
   private static formatError(error: unknown): string {
@@ -310,6 +337,7 @@ interface EmailProcessingEnv {
   AI_DAILY_NEURON_FALLBACK_THRESHOLD?: string | undefined;
   AI_EMBEDDING_MODEL?: string | undefined;
   MAX_EMAIL_BODY_CHARS?: string | undefined;
+  DEBUG_MODE?: string | undefined;
   MAX_CONTEXT_MEMORY_CHARS?: string | undefined;
   MAX_RAG_CONTEXT_CHARS?: string | undefined;
   RAG_TOP_K?: string | undefined;

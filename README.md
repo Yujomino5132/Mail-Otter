@@ -78,6 +78,7 @@ Set these in `wrangler.jsonc` under `vars` to override defaults:
 
 | Variable                                | Default                   | Description                                                                                                  |
 | --------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `DEBUG_MODE`                            | `false`                   | Appends metadata-only processing diagnostics to summary emails when set to `true`                            |
 | `MAX_APPLICATIONS_PER_USER`             | `99`                      | Hard limit on connected applications per user                                                                |
 | `MAX_CONTEXT_DOCUMENTS_PER_APPLICATION` | `10000`                   | Global ceiling on indexed documents per application                                                          |
 | `MAX_EMAIL_BODY_CHARS`                  | `12000`                   | Characters of email body sent to AI for summarization                                                        |

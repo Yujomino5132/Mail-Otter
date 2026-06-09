@@ -61,6 +61,7 @@ Webhook routes validate provider secrets or client state, enqueue lightweight jo
 - `EMAIL_PROCESSING_WORKFLOW`
 - `EMAIL_EVENTS_QUEUE`
 - hourly cron
+- `DEBUG_MODE`
 - `AI_SUMMARY_MODEL`
 - `AI_SUMMARY_FALLBACK_MODEL`
 - `AI_DAILY_NEURON_FALLBACK_THRESHOLD`

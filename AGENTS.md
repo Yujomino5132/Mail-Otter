@@ -53,7 +53,7 @@ volta run pnpm run build
 volta run pnpm run lint
 volta run pnpm run checks
 volta run pnpm run deploy
-volta run pnpm run cf-typegen
+volta run pnpm run typegen
 ```
 
 Cloudflare command equivalents:
@@ -64,7 +64,7 @@ Cloudflare command equivalents:
 | `volta run npx wrangler deploy` | Deploy to Cloudflare      |
 | `volta run npx wrangler types`  | Generate TypeScript types |
 
-Run `volta run pnpm run cf-typegen` after changing bindings in Wrangler config.
+Run `volta run pnpm run typegen` after changing bindings in Wrangler config.
 
 ## Architecture
 

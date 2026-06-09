@@ -11,6 +11,7 @@ declare global {
     EMAIL_EVENTS_QUEUE: Queue<EmailQueueMessage>;
     EMAIL_PROCESSING_WORKFLOW: Workflow<EmailQueueMessage>;
     EMAIL_CONTEXT_INDEX: Vectorize;
+    DEBUG_MODE?: string | undefined;
     SERVE_SPA_FROM_WORKER?: string | undefined;
     DEV_AUTH_EMAIL?: string | undefined;
     MAX_APPLICATIONS_PER_USER?: string | undefined;
