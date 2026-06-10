@@ -6,7 +6,7 @@ import { OutlookProviderUtil } from '@mail-otter/provider-clients/outlook';
 import type { GmailMessage } from '@mail-otter/provider-clients/gmail';
 import type { OutlookMessage } from '@mail-otter/provider-clients/outlook';
 import type { ConnectedApplication, EmailQueueMessage, ProviderSubscription } from '@mail-otter/shared/model';
-import { BadRequestError, NonRetryableError, RetryableError } from '@mail-otter/backend-errors';
+import { AiSummaryRetryableError, BadRequestError, NonRetryableError, RetryableError } from '@mail-otter/backend-errors';
 import { ConfigurationManager } from '@mail-otter/backend-runtime/config';
 import { CryptoUtil } from '@mail-otter/shared/utils';
 import type { ProviderId } from '@mail-otter/shared/constants';
@@ -198,8 +198,17 @@ class EmailProcessingUtil {
     const maxChars: number = ConfigurationManager.getMaxEmailBodyChars(env);
     const bodyText: string = body || '(empty message body)';
     const input: string = EmailContentUtil.truncate(bodyText, maxChars);
-    const model: string = await EmailProcessingUtil.resolveSummaryModel(env, input);
-    const result: EmailSummaryResult = await EmailSummaryUtil.summarizeEmailWithUsage(env.AI, model, subject, from, input, ragContext);
+    let model: string = await EmailProcessingUtil.resolveSummaryModel(env, input);
+    let result: EmailSummaryResult;
+    try {
+      result = await EmailSummaryUtil.summarizeEmailWithUsage(env.AI, model, subject, from, input, ragContext);
+    } catch (error: unknown) {
+      if (!(error instanceof AiSummaryRetryableError)) throw error;
+      const fallbackModel: string = ConfigurationManager.getEmailSummaryFallbackModel(env);
+      console.warn(`AI summary failed with primary model ${model}, retrying with fallback ${fallbackModel}:`, error);
+      model = fallbackModel;
+      result = await EmailSummaryUtil.summarizeEmailWithUsage(env.AI, model, subject, from, input, ragContext);
+    }
     const usageEstimate: AiTextGenerationUsageEstimate | undefined = await EmailProcessingUtil.recordSummaryUsage(env, model, result, input);
     if (!ConfigurationManager.getDebugMode(env)) return result.summary;
 
