@@ -72,14 +72,18 @@ class CronTasksWorker extends AbstractDurableObjectWorker {
 
   protected async runScheduledTasks(event: ScheduledController): Promise<void> {
     const ctx: ExecutionContext = this.createExecutionContext();
-    await new OAuth2AccessTokenRefreshTask().handle(event, this.env, ctx);
-    await new ContextDocumentPruningTask().handle(event, this.env, ctx);
-    await new ProcessedMessagePruningTask().handle(event, this.env, ctx);
-    await new StaleContextDocumentPruningTask().handle(event, this.env, ctx);
-    await new OAuth2SessionPruningTask().handle(event, this.env, ctx);
-    await new ContextDeletionRunPruningTask().handle(event, this.env, ctx);
-    await new AiDailyUsagePruningTask().handle(event, this.env, ctx);
-    await SubscriptionRenewalUtil.renewDueSubscriptions(this.env);
+    await Promise.all([
+      new OAuth2AccessTokenRefreshTask().handle(event, this.env, ctx),
+      new ContextDocumentPruningTask().handle(event, this.env, ctx),
+      SubscriptionRenewalUtil.renewDueSubscriptions(this.env),
+    ]);
+    await Promise.all([
+      new ProcessedMessagePruningTask().handle(event, this.env, ctx),
+      new StaleContextDocumentPruningTask().handle(event, this.env, ctx),
+      new OAuth2SessionPruningTask().handle(event, this.env, ctx),
+      new ContextDeletionRunPruningTask().handle(event, this.env, ctx),
+      new AiDailyUsagePruningTask().handle(event, this.env, ctx),
+    ]);
   }
 }
 
