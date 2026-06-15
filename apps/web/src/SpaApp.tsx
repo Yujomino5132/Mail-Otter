@@ -1327,7 +1327,7 @@ function ContextDocumentRow({
             onClick={() => onOpenProviderDocument(document.contextDocumentId)}
             disabled={document.status === 'deleted'}
           >
-            Open Provider
+            Open
           </button>
           <span className={`px-2 py-1 rounded text-xs font-medium ${statusClass}`}>{document.status.toUpperCase()}</span>
         </div>
