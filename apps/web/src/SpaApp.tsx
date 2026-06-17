@@ -1483,9 +1483,9 @@ function AuditLogsModal({
           <h2 className="text-lg font-semibold">Document Audit Logs</h2>
           <button className="text-[#9ca3af] hover:text-white text-xl leading-none" onClick={onClose}>&times;</button>
         </div>
-        <div className="overflow-y-auto p-5 space-y-3">
+        <div className="overflow-y-auto p-5 space-y-3 max-h-[calc(80vh-4rem)]">
           {logs.length === 0 && !loading && (
-            <div className="text-center text-[#aab4c2] py-8">No audit logs found for this document.</div>
+            <div className="text-center text-[#cbd5e1] py-8">No audit logs found for this document.</div>
           )}
           {logs.map((log, index) => {
             const severityColor =
@@ -1497,10 +1497,10 @@ function AuditLogsModal({
                     <span className={`inline-block w-2 h-2 rounded-full shrink-0 mt-1.5 ${severityColor}`} />
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-[#e5e7eb]">{log.eventLabel || auditEventLabels[log.eventType] || log.eventType}</div>
-                      <div className="text-xs text-[#7d8896] mt-0.5">
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#2d3745] text-[#aab4c2] text-[10px] font-medium mr-2 shrink-0">{logs.length - index}</span>
+                      <div className="text-xs text-[#9ca3af] mt-0.5">
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#2d3745] text-[#cbd5e1] text-[10px] font-medium mr-2 shrink-0">{logs.length - index}</span>
                         {formatTimestamp(log.createdAt)}
-                        <span className="ml-2 inline-block px-1.5 py-0.5 rounded bg-[#2d3745] text-[#aab4c2] text-[10px] uppercase">{log.eventType}</span>
+                        <span className="ml-2 inline-block px-1.5 py-0.5 rounded bg-[#2d3745] text-[#cbd5e1] text-[10px] uppercase">{log.eventType}</span>
                       </div>
                     </div>
                   </div>
@@ -1509,7 +1509,7 @@ function AuditLogsModal({
                   const data: unknown = log.eventData;
                   if (data == null) return null;
                   return (
-                    <div className="mt-2 text-xs text-[#7d8896] font-mono bg-[#0b0f16] border border-[#2d3745] rounded p-2 overflow-x-auto">
+                    <div className="mt-2 text-xs text-[#9ca3af] font-mono bg-[#0b0f16] border border-[#2d3745] rounded p-2 overflow-x-auto">
                       {typeof data === 'object' ? JSON.stringify(data, null, 1) : String(data)}
                     </div>
                   );
