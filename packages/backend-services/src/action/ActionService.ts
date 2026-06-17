@@ -100,7 +100,6 @@ class ActionService {
         ].join('');
       }),
       '</ul>',
-      '<p><small>Mail-Otter will show a confirmation page before executing any action.</small></p>',
     ].join('\n');
   }
 
