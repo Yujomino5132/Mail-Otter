@@ -11,7 +11,8 @@ vi.mock('@mail-otter/backend-services/email', async (importOriginal) => {
     EmailProcessingUtil: {
       ...actual.EmailProcessingUtil,
       resolveApplication: vi.fn(),
-      processOutlookMessage: vi.fn(),
+      generateOutlookSummary: vi.fn(),
+      sendOutlookSummary: vi.fn(),
     },
   };
 });
@@ -38,14 +39,23 @@ describe('EmailProcessingWorkflow', () => {
 
   it('passes the workflow retry attempt into email processing', async () => {
     vi.mocked(EmailProcessingUtil.resolveApplication).mockResolvedValue(resolvedApplication as never);
-    vi.mocked(EmailProcessingUtil.processOutlookMessage).mockResolvedValue();
+    vi.mocked(EmailProcessingUtil.generateOutlookSummary).mockResolvedValue({
+      message: { id: 'message-1', conversationId: 'conv-1' },
+      summaryHtml: '<p>Summary</p>',
+      actions: [],
+      application: resolvedApplication.application,
+      accessToken: resolvedApplication.accessToken,
+      messageId: 'message-1',
+      options: { retryAttempt: 3 },
+    } as never);
+    vi.mocked(EmailProcessingUtil.sendOutlookSummary).mockResolvedValue();
     const workflow = new EmailProcessingWorkflow({} as ExecutionContext, createEnv());
     const step = createStep(3);
     const event = createEvent();
 
     await workflow.run(event, step);
 
-    expect(EmailProcessingUtil.processOutlookMessage).toHaveBeenCalledWith(
+    expect(EmailProcessingUtil.generateOutlookSummary).toHaveBeenCalledWith(
       resolvedApplication.application,
       resolvedApplication.accessToken,
       'message-1',
@@ -53,12 +63,16 @@ describe('EmailProcessingWorkflow', () => {
       resolvedApplication.enabledApplicationIds,
       { retryAttempt: 3 },
     );
+    expect(EmailProcessingUtil.sendOutlookSummary).toHaveBeenCalledWith(
+      expect.objectContaining({ messageId: 'message-1' }),
+      expect.objectContaining({ DB: expect.any(Object) }),
+    );
   });
 
   it('leaves retryable errors retryable for the workflow step policy', async () => {
     vi.mocked(EmailProcessingUtil.resolveApplication).mockResolvedValue(resolvedApplication as never);
     const error = new RetryableError('Temporary provider failure.');
-    vi.mocked(EmailProcessingUtil.processOutlookMessage).mockRejectedValue(error);
+    vi.mocked(EmailProcessingUtil.generateOutlookSummary).mockRejectedValue(error);
     const workflow = new EmailProcessingWorkflow({} as ExecutionContext, createEnv());
 
     await expect(workflow.run(createEvent(), createStep(1))).rejects.toBe(error);

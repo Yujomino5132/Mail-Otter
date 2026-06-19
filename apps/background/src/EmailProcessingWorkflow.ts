@@ -2,7 +2,7 @@ import { AbstractWorkflowWorker } from '@mail-otter/backend-runtime/base';
 import { createD1SessionEnv } from '@mail-otter/backend-data/utils';
 import { DatabaseError, NonRetryableError, RetryableError } from '@mail-otter/backend-errors';
 import { EmailProcessingUtil } from '@mail-otter/backend-services/email';
-import type { GmailMessageList, ResolvedApplication } from '@mail-otter/backend-services/email';
+import type { GmailMessageList, GmailSummaryData, OutlookSummaryData, ResolvedApplication } from '@mail-otter/backend-services/email';
 import type { EmailQueueMessage } from '@mail-otter/shared/model';
 import type { WorkflowEvent, WorkflowStep, WorkflowStepContext } from 'cloudflare:workers';
 import { NonRetryableError as WorkflowNonRetryableError } from 'cloudflare:workflows';
@@ -45,12 +45,12 @@ class EmailProcessingWorkflow extends AbstractWorkflowWorker<EmailQueueMessage, 
 
       if (messageList) {
         for (const messageId of messageList.messageIds) {
-          await step.do(
-            `Summarize Gmail Message ${messageId}`,
+          const summaryData = await step.do(
+            `Generate Gmail Summary for ${messageId}`,
             { retries: { limit: 5, delay: '30 seconds', backoff: 'exponential' }, timeout: '5 minutes' },
-            async (context: WorkflowStepContext): Promise<void> => {
+            async (context: WorkflowStepContext): Promise<GmailSummaryData | null> => {
               try {
-                await EmailProcessingUtil.processGmailMessage(
+                return await EmailProcessingUtil.generateGmailSummary(
                   resolved.application,
                   resolved.accessToken,
                   messageId,
@@ -63,6 +63,20 @@ class EmailProcessingWorkflow extends AbstractWorkflowWorker<EmailQueueMessage, 
               }
             },
           );
+
+          if (summaryData) {
+            await step.do(
+              `Send Gmail Summary for ${messageId}`,
+              { retries: { limit: 3, delay: '10 seconds', backoff: 'exponential' }, timeout: '2 minutes' },
+              async (): Promise<void> => {
+                try {
+                  await EmailProcessingUtil.sendGmailSummary(summaryData, createD1SessionEnv(this.env));
+                } catch (error: unknown) {
+                  throw EmailProcessingWorkflow.toWorkflowError(error);
+                }
+              },
+            );
+          }
         }
 
         await step.do(
@@ -83,12 +97,12 @@ class EmailProcessingWorkflow extends AbstractWorkflowWorker<EmailQueueMessage, 
       }
     } else if (event.payload.type === 'outlook-notification') {
       const outlookPayload = event.payload;
-      await step.do(
-        'Summarize Outlook Message',
+      const summaryData = await step.do(
+        'Generate Outlook Summary',
         { retries: { limit: 5, delay: '30 seconds', backoff: 'exponential' }, timeout: '5 minutes' },
-        async (context: WorkflowStepContext): Promise<void> => {
+        async (context: WorkflowStepContext): Promise<OutlookSummaryData | null> => {
           try {
-            await EmailProcessingUtil.processOutlookMessage(
+            return await EmailProcessingUtil.generateOutlookSummary(
               resolved.application,
               resolved.accessToken,
               outlookPayload.messageId,
@@ -101,6 +115,20 @@ class EmailProcessingWorkflow extends AbstractWorkflowWorker<EmailQueueMessage, 
           }
         },
       );
+
+      if (summaryData) {
+        await step.do(
+          'Send Outlook Summary',
+          { retries: { limit: 3, delay: '10 seconds', backoff: 'exponential' }, timeout: '2 minutes' },
+          async (): Promise<void> => {
+            try {
+              await EmailProcessingUtil.sendOutlookSummary(summaryData, createD1SessionEnv(this.env));
+            } catch (error: unknown) {
+              throw EmailProcessingWorkflow.toWorkflowError(error);
+            }
+          },
+        );
+      }
     }
 
     return {
