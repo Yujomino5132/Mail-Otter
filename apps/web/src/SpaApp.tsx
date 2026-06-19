@@ -1480,7 +1480,7 @@ function AuditLogsModal({
       <div className="fixed inset-0 bg-black/60" />
       <div className="relative bg-[#111827] border border-[#374151] rounded-lg w-full max-w-2xl max-h-[80vh] overflow-hidden shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#2d3745]">
-          <h2 className="text-lg font-semibold">Document Audit Logs</h2>
+          <h2 className="text-lg font-semibold text-white">Document Audit Logs</h2>
           <button className="text-[#9ca3af] hover:text-white text-xl leading-none" onClick={onClose}>&times;</button>
         </div>
         <div className="overflow-y-auto p-5 space-y-3 max-h-[calc(80vh-4rem)]">
