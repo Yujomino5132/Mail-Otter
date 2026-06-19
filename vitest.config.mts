@@ -18,6 +18,28 @@ export default defineConfig({
     environment: 'node',
     include: ['test/**/*.test.ts'],
     exclude: ['test/integration/**'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'html'],
+      reportsDirectory: './coverage',
+      include: [
+        'apps/api/src/**/*.ts',
+        'apps/background/src/**/*.ts',
+        'packages/**/src/**/*.ts',
+      ],
+      exclude: [
+        '**/*.test.ts',
+        '**/*.d.ts',
+        '**/index.ts',
+        '**/types.d.ts',
+      ],
+      thresholds: {
+        statements: 90,
+        branches: 80,
+        functions: 90,
+        lines: 90,
+      },
+    },
   },
   resolve: {
     alias: [

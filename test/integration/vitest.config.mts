@@ -31,6 +31,23 @@ export default defineConfig({
   test: {
     globals: true,
     include: ['test/integration/**/*.int.test.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'html'],
+      reportsDirectory: './coverage-integration',
+      include: [
+        'apps/api/src/**/*.ts',
+        'apps/background/src/**/*.ts',
+        'packages/**/src/**/*.ts',
+      ],
+      exclude: [
+        '**/*.test.ts',
+        '**/*.int.test.ts',
+        '**/*.d.ts',
+        '**/index.ts',
+        '**/types.d.ts',
+      ],
+    },
     pool: cloudflarePool({
       wrangler: {
         configPath: './test/integration/wrangler.test.jsonc',
