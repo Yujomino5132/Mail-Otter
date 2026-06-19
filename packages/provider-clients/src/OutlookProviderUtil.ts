@@ -270,8 +270,8 @@ class OutlookProviderUtil {
     url.searchParams.set(
       '$filter',
       marker
-        ? `contains(subject, 'OtterSum-${marker}')`
-        : `contains(subject, '[OtterSum-')`,
+        ? `startswith(subject, '[OtterSum-${marker}]')`
+        : `startswith(subject, '[OtterSum-')`,
     );
     url.searchParams.set('$orderby', 'sentDateTime desc');
     url.searchParams.set('$top', '1');
