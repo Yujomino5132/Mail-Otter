@@ -44,12 +44,12 @@ describe('OutlookProviderUtil', () => {
       // Step 1: inbox idempotency check
       const inboxUrl = fetchMock.mock.calls[0][0] as string;
       expect(inboxUrl).toContain('/me/mailFolders/inbox/messages');
-      expect(inboxUrl).toContain('X-Mail-Otter-Summary');
+      expect(inboxUrl).toContain(encodeURIComponent('[OtterSum-'));
 
       // Step 2: sent items idempotency check
       const sentItemsCheckUrl = fetchMock.mock.calls[1][0] as string;
       expect(sentItemsCheckUrl).toContain('/me/mailFolders/sentitems/messages');
-      expect(sentItemsCheckUrl).toContain('X-Mail-Otter-Summary');
+      expect(sentItemsCheckUrl).toContain(encodeURIComponent('[OtterSum-'));
 
       // Step 3: reply with sink address
       expect(fetchMock).toHaveBeenNthCalledWith(
@@ -64,30 +64,22 @@ describe('OutlookProviderUtil', () => {
 
       expect(replyHeaders['Content-Type']).toBe('application/json');
       expect(replyHeaders['Authorization']).toBe('Bearer test-access-token');
-      expect(parsedBody).toEqual({
-        message: {
-          body: {
-            contentType: 'html',
-            content: htmlSummary,
-          },
-          toRecipients: [
-            {
-              emailAddress: {
-                address: 'sender+sink@example.com',
-              },
-            },
-          ],
-          internetMessageHeaders: [
-            { name: 'X-Mail-Otter-Summary', value: 'true' },
-          ],
-        },
+      expect(parsedBody.message.subject).toMatch(/^\[OtterSum-/);
+      expect(parsedBody.message.body).toEqual({
+        contentType: 'html',
+        content: htmlSummary,
       });
+      expect(parsedBody.message.toRecipients).toEqual([
+        { emailAddress: { address: 'sender+sink@example.com' } },
+      ]);
+      expect(parsedBody.message.internetMessageHeaders).toEqual([
+        { name: 'X-Mail-Otter-Summary', value: 'true' },
+      ]);
 
       // Step 4: find sent summary message (also in sentitems folder)
       const findUrl = fetchMock.mock.calls[3][0] as string;
       expect(findUrl).toContain('/me/mailFolders/sentitems/messages');
-      expect(findUrl).toContain('internetMessageHeaders');
-      expect(findUrl).toContain('X-Mail-Otter-Summary');
+      expect(findUrl).toContain('OtterSum-');
       expect(findUrl).toContain(encodeURIComponent('$top') + '=1');
       expect(findUrl).toContain(encodeURIComponent('$orderby') + '=sentDateTime+desc');
 

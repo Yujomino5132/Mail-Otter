@@ -226,6 +226,8 @@ class OutlookProviderUtil {
     const sinkAddress: string = atIndex !== -1
       ? `${mailboxAddress.slice(0, atIndex)}+sink${mailboxAddress.slice(atIndex)}`
       : mailboxAddress;
+    const marker: string = crypto.randomUUID();
+    const originalSubject: string = originalMessage.subject || '';
     const response: Response = await fetch(
       `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(originalMessage.id)}/reply`,
       {
@@ -236,6 +238,7 @@ class OutlookProviderUtil {
         },
         body: JSON.stringify({
           message: {
+            subject: `[OtterSum-${marker}] Re: ${originalSubject}`,
             body: {
               contentType: 'html',
               content: summary,
@@ -257,16 +260,18 @@ class OutlookProviderUtil {
     if (!response.ok) {
       throw OutlookProviderUtil.createApiError('send summary reply', response, await response.text());
     }
-    const sentMessageId: string = await OutlookProviderUtil.findSentSummaryMessage(accessToken);
+    const sentMessageId: string = await OutlookProviderUtil.findSentSummaryMessage(accessToken, marker);
     await OutlookProviderUtil.copyMessage(accessToken, sentMessageId, 'inbox');
     await OutlookProviderUtil.deleteMessage(accessToken, sentMessageId);
   }
 
-  private static async findSummaryMessageInFolder(accessToken: string, folderId: string): Promise<string | null> {
+  private static async findSummaryMessageInFolder(accessToken: string, folderId: string, marker?: string): Promise<string | null> {
     const url: URL = new URL(`https://graph.microsoft.com/v1.0/me/mailFolders/${folderId}/messages`);
     url.searchParams.set(
       '$filter',
-      `internetMessageHeaders/any(h:h/name eq 'X-Mail-Otter-Summary' and h/value eq 'true')`,
+      marker
+        ? `contains(subject, 'OtterSum-${marker}')`
+        : `contains(subject, '[OtterSum-')`,
     );
     url.searchParams.set('$orderby', 'sentDateTime desc');
     url.searchParams.set('$top', '1');
@@ -277,8 +282,8 @@ class OutlookProviderUtil {
     return data.value && data.value.length > 0 ? data.value[0].id : null;
   }
 
-  private static async findSentSummaryMessage(accessToken: string): Promise<string> {
-    const id: string | null = await OutlookProviderUtil.findSummaryMessageInFolder(accessToken, 'sentitems');
+  private static async findSentSummaryMessage(accessToken: string, marker: string): Promise<string> {
+    const id: string | null = await OutlookProviderUtil.findSummaryMessageInFolder(accessToken, 'sentitems', marker);
     if (!id) {
       throw new ProviderApiRetryableError('Microsoft Graph did not return the sent summary message.');
     }
