@@ -1,0 +1,657 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const {
+  mockCreate,
+  mockDeleteByProcessedMessageId,
+  mockGetForUser,
+  mockGetByTokenHash,
+  mockListActionsForUser,
+  mockListExecutionsForUser,
+  mockExpirePendingActions,
+  mockDeleteOlderThan,
+  mockClaimForExecution,
+  mockMarkSucceeded,
+  mockMarkFailed,
+  mockMarkExpired,
+  mockRecordExecution,
+  mockGetById,
+} = vi.hoisted(() => ({
+  mockCreate: vi.fn(),
+  mockDeleteByProcessedMessageId: vi.fn(),
+  mockGetForUser: vi.fn(),
+  mockGetByTokenHash: vi.fn(),
+  mockListActionsForUser: vi.fn(),
+  mockListExecutionsForUser: vi.fn(),
+  mockExpirePendingActions: vi.fn(),
+  mockDeleteOlderThan: vi.fn(),
+  mockClaimForExecution: vi.fn(),
+  mockMarkSucceeded: vi.fn(),
+  mockMarkFailed: vi.fn(),
+  mockMarkExpired: vi.fn(),
+  mockRecordExecution: vi.fn(),
+  mockGetById: vi.fn(),
+}));
+
+vi.mock('@mail-otter/backend-data/dao', () => ({
+  EmailActionDAO: vi.fn(function () {
+    return {
+      create: mockCreate,
+      deleteByProcessedMessageId: mockDeleteByProcessedMessageId,
+      getForUser: mockGetForUser,
+      getByTokenHash: mockGetByTokenHash,
+      listActionsForUser: mockListActionsForUser,
+      listExecutionsForUser: mockListExecutionsForUser,
+      expirePendingActions: mockExpirePendingActions,
+      deleteOlderThan: mockDeleteOlderThan,
+      claimForExecution: mockClaimForExecution,
+      markSucceeded: mockMarkSucceeded,
+      markFailed: mockMarkFailed,
+      markExpired: mockMarkExpired,
+      recordExecution: mockRecordExecution,
+    };
+  }),
+  ConnectedApplicationDAO: vi.fn(function () {
+    return { getById: mockGetById };
+  }),
+}));
+
+vi.mock('@mail-otter/backend-runtime/config', () => ({
+  ConfigurationManager: {
+    getActionCallbackBaseUrl: vi.fn(() => ''),
+    getActionDefaultExpiryHours: vi.fn(() => 24),
+    getActionRetentionDays: vi.fn(() => 30),
+  },
+}));
+
+vi.mock('@mail-otter/shared/utils', () => ({
+  TimestampUtil: {
+    getCurrentUnixTimestampInSeconds: vi.fn(() => 1778200000),
+    addHours: vi.fn((ts: number, h: number) => ts + h * 3600),
+    subtractDays: vi.fn((ts: number, d: number) => ts - d * 86400),
+  },
+  CryptoUtil: {
+    randomBase64Url: vi.fn(() => 'random-token'),
+    hmacSha256Hex: vi.fn(async () => 'hashed-token'),
+  },
+  UUIDUtil: {
+    getRandomUUID: vi.fn(() => 'action-uuid'),
+  },
+}));
+
+vi.mock('../../packages/backend-services/src/oauth2/OAuth2AccessTokenService', () => ({
+  OAuth2AccessTokenService: {
+    getAccessToken: vi.fn(async () => 'access-token'),
+  },
+}));
+
+vi.mock('@mail-otter/provider-clients/gmail', () => ({
+  GmailProviderUtil: {
+    createCalendarEvent: vi.fn(),
+    getMessage: vi.fn(),
+    createDraftReply: vi.fn(),
+  },
+}));
+
+vi.mock('@mail-otter/provider-clients/outlook', () => ({
+  OutlookProviderUtil: {
+    createCalendarEvent: vi.fn(),
+    createDraftReply: vi.fn(),
+  },
+}));
+
+import { ActionService } from '../../packages/backend-services/src/action/ActionService';
+import { GmailProviderUtil } from '@mail-otter/provider-clients/gmail';
+import { OutlookProviderUtil } from '@mail-otter/provider-clients/outlook';
+
+const NOW = 1778200000;
+const FUTURE_EXPIRY = NOW + 86400;
+
+function makeEnv(overrides?: Record<string, unknown>) {
+  return {
+    DB: {} as D1Database,
+    ACTION_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('enc-key') },
+    ACTION_SIGNING_SECRET: { get: vi.fn().mockResolvedValue('sign-key') },
+    AES_ENCRYPTION_KEY_SECRET: { get: vi.fn().mockResolvedValue('aes-key') },
+    OAUTH2_TOKEN_CACHE: {} as KVNamespace,
+    OAUTH2_TOKEN_REFRESHERS: {} as DurableObjectNamespace,
+    ...overrides,
+  };
+}
+
+function makeAction(overrides?: Record<string, unknown>) {
+  return {
+    actionId: 'action-1',
+    applicationId: 'app-1',
+    userEmail: 'user@example.com',
+    providerId: 'google-gmail',
+    title: 'Test Action',
+    description: 'Do something',
+    actionType: 'manual.todo',
+    riskLevel: 'low',
+    status: 'pending',
+    tokenHash: 'hashed-token',
+    payload: { type: 'manual.todo', title: 'Test Action', description: 'Do something', instructions: 'Just do it' },
+    expiresAt: FUTURE_EXPIRY,
+    providerMessageId: 'msg-1',
+    providerThreadId: 'thread-1',
+    errorMessage: null,
+    result: null,
+    ...overrides,
+  };
+}
+
+describe('ActionService', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('renderActionItems', () => {
+    it('renders each action as an HTML list item', () => {
+      const action = makeAction();
+      const items = ActionService.renderActionItems([
+        { action: action as never, token: 'tok', confirmationUrl: 'https://example.com/api/actions/action-1?token=tok' },
+      ]);
+
+      expect(items).toHaveLength(1);
+      expect(items[0]).toContain('<li>');
+      expect(items[0]).toContain('Test Action');
+      expect(items[0]).toContain('https://example.com/api/actions/action-1?token=tok');
+    });
+
+    it('returns empty array when no actions provided', () => {
+      expect(ActionService.renderActionItems([])).toEqual([]);
+    });
+
+    it('escapes HTML special characters in title', () => {
+      const action = makeAction({ title: '<script>alert("xss")</script>' });
+      const items = ActionService.renderActionItems([
+        { action: action as never, token: 'tok', confirmationUrl: 'https://example.com/confirm' },
+      ]);
+      expect(items[0]).not.toContain('<script>');
+      expect(items[0]).toContain('&lt;script&gt;');
+    });
+  });
+
+  describe('renderEmailActionSection', () => {
+    it('returns empty string for zero actions', () => {
+      expect(ActionService.renderEmailActionSection([])).toBe('');
+    });
+
+    it('renders a section wrapping the action list', () => {
+      const action = makeAction();
+      const html = ActionService.renderEmailActionSection([
+        { action: action as never, token: 'tok', confirmationUrl: 'https://example.com/confirm' },
+      ]);
+
+      expect(html).toContain('<ul>');
+      expect(html).toContain('Available actions');
+      expect(html).toContain('</ul>');
+    });
+  });
+
+  describe('expirePendingActions', () => {
+    it('passes current timestamp and limit to DAO and returns count', async () => {
+      mockExpirePendingActions.mockResolvedValue(3);
+
+      const result = await ActionService.expirePendingActions(makeEnv() as never, 100);
+
+      expect(result).toBe(3);
+      expect(mockExpirePendingActions).toHaveBeenCalledWith(NOW, 100);
+    });
+  });
+
+  describe('deleteOldActions', () => {
+    it('calculates retention cutoff and delegates deletion, returning count', async () => {
+      mockDeleteOlderThan.mockResolvedValue(7);
+
+      const result = await ActionService.deleteOldActions(makeEnv() as never, 200);
+
+      expect(result).toBe(7);
+      expect(mockDeleteOlderThan).toHaveBeenCalledWith(expect.any(Number), 200);
+    });
+  });
+
+  describe('listActionsForUser', () => {
+    it('delegates to DAO and returns list', async () => {
+      mockListActionsForUser.mockResolvedValue({ items: [makeAction()], cursor: null });
+
+      const result = await ActionService.listActionsForUser('user@example.com', { applicationId: 'app-1' }, makeEnv() as never);
+
+      expect(result.items).toHaveLength(1);
+      expect(mockListActionsForUser).toHaveBeenCalledWith('user@example.com', { applicationId: 'app-1' });
+    });
+  });
+
+  describe('listExecutionsForUser', () => {
+    it('delegates to DAO and returns execution list', async () => {
+      mockListExecutionsForUser.mockResolvedValue({ items: [], cursor: null });
+
+      const result = await ActionService.listExecutionsForUser('action-1', 'user@example.com', makeEnv() as never);
+
+      expect(result).toEqual({ items: [], cursor: null });
+      expect(mockListExecutionsForUser).toHaveBeenCalledWith('action-1', 'user@example.com');
+    });
+  });
+
+  describe('getConfirmationResponse', () => {
+    it('returns 404 when action is not found by token hash', async () => {
+      mockGetByTokenHash.mockResolvedValue(undefined);
+
+      const result = await ActionService.getConfirmationResponse('action-1', 'bad-token', makeEnv() as never);
+
+      expect(result.statusCode).toBe(404);
+      expect(result.html).toContain('Action not found');
+    });
+
+    it('returns 200 with confirmation page when action is found', async () => {
+      mockGetByTokenHash.mockResolvedValue(makeAction());
+
+      const result = await ActionService.getConfirmationResponse('action-1', 'valid-token', makeEnv() as never);
+
+      expect(result.statusCode).toBe(200);
+      expect(result.html).toContain('Test Action');
+      expect(result.html).toContain('<!doctype html>');
+    });
+
+    it('renders expired indicator for an expired action', async () => {
+      mockGetByTokenHash.mockResolvedValue(makeAction({ status: 'expired', expiresAt: 1000 }));
+
+      const result = await ActionService.getConfirmationResponse('action-1', 'token', makeEnv() as never);
+
+      expect(result.statusCode).toBe(200);
+      expect(result.html).toContain('expired');
+    });
+
+    it('renders confirmation form for pending non-expired action', async () => {
+      mockGetByTokenHash.mockResolvedValue(makeAction({ status: 'pending', expiresAt: FUTURE_EXPIRY }));
+
+      const result = await ActionService.getConfirmationResponse('action-1', 'token', makeEnv() as never);
+
+      expect(result.html).toContain('<form');
+      expect(result.html).toContain('Confirm action');
+    });
+  });
+
+  describe('executeActionWithToken', () => {
+    it('returns 404 when action not found', async () => {
+      mockGetByTokenHash.mockResolvedValue(undefined);
+
+      const result = await ActionService.executeActionWithToken(
+        'action-1',
+        'bad-token',
+        new Request('https://example.com'),
+        makeEnv() as never,
+      );
+
+      expect(result.statusCode).toBe(404);
+    });
+
+    it('does not re-execute an already succeeded action', async () => {
+      const succeededAction = makeAction({ status: 'succeeded' });
+      mockGetByTokenHash.mockResolvedValue(succeededAction);
+      mockGetForUser.mockResolvedValue(succeededAction);
+
+      const result = await ActionService.executeActionWithToken(
+        'action-1',
+        'token',
+        new Request('https://example.com'),
+        makeEnv() as never,
+      );
+
+      expect(result.statusCode).toBe(200);
+      expect(mockClaimForExecution).not.toHaveBeenCalled();
+    });
+
+    it('executes manual.todo action and marks it succeeded', async () => {
+      const pendingAction = makeAction();
+      const doneAction = makeAction({ status: 'succeeded' });
+      mockGetByTokenHash.mockResolvedValue(pendingAction);
+      mockClaimForExecution.mockResolvedValue(true);
+      mockMarkSucceeded.mockResolvedValue(undefined);
+      mockRecordExecution.mockResolvedValue(undefined);
+      mockGetForUser.mockResolvedValue(doneAction);
+
+      const result = await ActionService.executeActionWithToken(
+        'action-1',
+        'token',
+        new Request('https://example.com'),
+        makeEnv() as never,
+      );
+
+      expect(result.statusCode).toBe(200);
+      expect(mockMarkSucceeded).toHaveBeenCalled();
+    });
+
+    it('marks action expired when expiresAt is in the past', async () => {
+      const expiredAction = makeAction({ expiresAt: 1000 });
+      const refreshedAction = makeAction({ status: 'expired' });
+      mockGetByTokenHash.mockResolvedValue(expiredAction);
+      mockMarkExpired.mockResolvedValue(undefined);
+      mockRecordExecution.mockResolvedValue(undefined);
+      mockGetForUser.mockResolvedValue(refreshedAction);
+
+      const result = await ActionService.executeActionWithToken(
+        'action-1',
+        'token',
+        new Request('https://example.com'),
+        makeEnv() as never,
+      );
+
+      expect(result.statusCode).toBe(200);
+      expect(mockMarkExpired).toHaveBeenCalledWith('action-1');
+    });
+  });
+
+  describe('executeActionForUser', () => {
+    it('throws when action is not found', async () => {
+      mockGetForUser.mockResolvedValue(undefined);
+
+      await expect(
+        ActionService.executeActionForUser('action-1', 'user@example.com', new Request('https://example.com'), makeEnv() as never),
+      ).rejects.toThrow('Email action was not found.');
+    });
+
+    it('executes found action and returns result', async () => {
+      const action = makeAction();
+      const doneAction = makeAction({ status: 'succeeded' });
+      mockGetForUser.mockResolvedValueOnce(action).mockResolvedValueOnce(doneAction);
+      mockClaimForExecution.mockResolvedValue(true);
+      mockMarkSucceeded.mockResolvedValue(undefined);
+      mockRecordExecution.mockResolvedValue(undefined);
+
+      const result = await ActionService.executeActionForUser(
+        'action-1',
+        'user@example.com',
+        new Request('https://example.com'),
+        makeEnv() as never,
+      );
+
+      expect(result.status).toBe('succeeded');
+    });
+  });
+
+  describe('createActionsForSummary', () => {
+    it('returns empty array when proposals list is empty', async () => {
+      const result = await ActionService.createActionsForSummary(
+        {
+          application: { applicationId: 'app-1', userEmail: 'user@example.com', providerId: 'google-gmail' },
+          processedMessage: { processedMessageId: 'pm-1', providerMessageId: 'msg-1', providerThreadId: 'thread-1' } as never,
+          subject: 'Test',
+          from: 'sender@example.com',
+          body: '',
+          proposals: [],
+          callbackBaseUrl: 'https://example.com',
+        },
+        makeEnv() as never,
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array when no callbackBaseUrl is configured', async () => {
+      const result = await ActionService.createActionsForSummary(
+        {
+          application: { applicationId: 'app-1', userEmail: 'user@example.com', providerId: 'google-gmail' },
+          processedMessage: { processedMessageId: 'pm-1', providerMessageId: 'msg-1', providerThreadId: 'thread-1' } as never,
+          subject: 'Test',
+          from: 'sender@example.com',
+          body: '',
+          proposals: [{ type: 'manual.todo', title: 'Do it', description: 'Now', parameters: { instructions: 'Step 1' } }],
+        },
+        makeEnv() as never,
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    it('creates manual.todo action from proposal', async () => {
+      mockDeleteByProcessedMessageId.mockResolvedValue(undefined);
+      mockCreate.mockResolvedValue(makeAction());
+
+      const result = await ActionService.createActionsForSummary(
+        {
+          application: { applicationId: 'app-1', userEmail: 'user@example.com', providerId: 'google-gmail' },
+          processedMessage: { processedMessageId: 'pm-1', providerMessageId: 'msg-1', providerThreadId: 'thread-1' } as never,
+          subject: 'Meeting tomorrow',
+          from: 'boss@example.com',
+          body: '',
+          callbackBaseUrl: 'https://example.com',
+          proposals: [{ type: 'manual.todo', title: 'Prepare slides', description: 'For the meeting', parameters: { instructions: 'Make slides' } }],
+        },
+        makeEnv() as never,
+      );
+
+      expect(result).toHaveLength(1);
+      expect(result[0].token).toBe('random-token');
+      expect(result[0].confirmationUrl).toContain('/api/actions/action-1');
+    });
+
+    it('creates calendar.add_event action with valid ISO dates', async () => {
+      mockDeleteByProcessedMessageId.mockResolvedValue(undefined);
+      mockCreate.mockResolvedValue(makeAction({ actionType: 'calendar.add_event' }));
+
+      const result = await ActionService.createActionsForSummary(
+        {
+          application: { applicationId: 'app-1', userEmail: 'user@example.com', providerId: 'google-gmail' },
+          processedMessage: { processedMessageId: 'pm-1', providerMessageId: 'msg-1', providerThreadId: 'thread-1' } as never,
+          subject: 'Team sync',
+          from: 'organizer@example.com',
+          body: '',
+          callbackBaseUrl: 'https://example.com',
+          proposals: [{
+            type: 'calendar.add_event',
+            title: 'Team Sync',
+            description: 'Weekly standup',
+            parameters: { startTime: '2026-07-01T10:00:00Z', endTime: '2026-07-01T11:00:00Z', timeZone: 'UTC' },
+          }],
+        },
+        makeEnv() as never,
+      );
+
+      expect(result).toHaveLength(1);
+    });
+
+    it('falls back to manual.todo for calendar.add_event with invalid dates', async () => {
+      mockDeleteByProcessedMessageId.mockResolvedValue(undefined);
+      mockCreate.mockResolvedValue(makeAction({ actionType: 'manual.todo' }));
+
+      const result = await ActionService.createActionsForSummary(
+        {
+          application: { applicationId: 'app-1', userEmail: 'user@example.com', providerId: 'google-gmail' },
+          processedMessage: { processedMessageId: 'pm-1', providerMessageId: 'msg-1', providerThreadId: 'thread-1' } as never,
+          subject: 'Meeting',
+          from: 'sender@example.com',
+          body: '',
+          callbackBaseUrl: 'https://example.com',
+          proposals: [{
+            type: 'calendar.add_event',
+            title: 'Broken event',
+            description: 'Bad dates',
+            parameters: { startTime: 'not-a-date', endTime: 'also-not-a-date' },
+          }],
+        },
+        makeEnv() as never,
+      );
+
+      expect(result).toHaveLength(1);
+    });
+
+    it('creates external.open_link action for URL found in body', async () => {
+      mockDeleteByProcessedMessageId.mockResolvedValue(undefined);
+      mockCreate.mockResolvedValue(makeAction({ actionType: 'external.open_link' }));
+
+      const result = await ActionService.createActionsForSummary(
+        {
+          application: { applicationId: 'app-1', userEmail: 'user@example.com', providerId: 'google-gmail' },
+          processedMessage: { processedMessageId: 'pm-1', providerMessageId: 'msg-1', providerThreadId: 'thread-1' } as never,
+          subject: 'Link email',
+          from: 'sender@example.com',
+          body: 'Check out https://example.com/report for details.',
+          callbackBaseUrl: 'https://api.example.com',
+          proposals: [{
+            type: 'external.open_link',
+            title: 'View report',
+            description: 'See the report',
+            parameters: { url: 'https://example.com/report' },
+          }],
+        },
+        makeEnv() as never,
+      );
+
+      expect(result).toHaveLength(1);
+    });
+
+    it('falls back to manual.todo for external.open_link with disallowed URL', async () => {
+      mockDeleteByProcessedMessageId.mockResolvedValue(undefined);
+      mockCreate.mockResolvedValue(makeAction({ actionType: 'manual.todo' }));
+
+      const result = await ActionService.createActionsForSummary(
+        {
+          application: { applicationId: 'app-1', userEmail: 'user@example.com', providerId: 'google-gmail' },
+          processedMessage: { processedMessageId: 'pm-1', providerMessageId: 'msg-1', providerThreadId: 'thread-1' } as never,
+          subject: 'Suspicious link',
+          from: 'sender@example.com',
+          body: 'No links here.',
+          callbackBaseUrl: 'https://api.example.com',
+          proposals: [{
+            type: 'external.open_link',
+            title: 'Visit site',
+            description: 'Click here',
+            parameters: { url: 'https://phishing.example.com/steal' },
+          }],
+        },
+        makeEnv() as never,
+      );
+
+      expect(result).toHaveLength(1);
+    });
+
+    it('skips proposals with unknown action type', async () => {
+      mockDeleteByProcessedMessageId.mockResolvedValue(undefined);
+
+      const result = await ActionService.createActionsForSummary(
+        {
+          application: { applicationId: 'app-1', userEmail: 'user@example.com', providerId: 'google-gmail' },
+          processedMessage: { processedMessageId: 'pm-1', providerMessageId: 'msg-1', providerThreadId: 'thread-1' } as never,
+          subject: 'Test',
+          from: 'sender@example.com',
+          body: '',
+          callbackBaseUrl: 'https://example.com',
+          proposals: [{ type: 'unknown_type', title: 'Unknown', description: 'No handler', parameters: {} }],
+        },
+        makeEnv() as never,
+      );
+
+      expect(result).toEqual([]);
+    });
+
+    it('limits created actions to 4 per summary', async () => {
+      mockDeleteByProcessedMessageId.mockResolvedValue(undefined);
+      mockCreate.mockResolvedValue(makeAction());
+
+      const proposals = Array.from({ length: 6 }, (_, i) => ({
+        type: 'manual.todo' as const,
+        title: `Action ${i}`,
+        description: `Desc ${i}`,
+        parameters: { instructions: `Do ${i}` },
+      }));
+
+      const result = await ActionService.createActionsForSummary(
+        {
+          application: { applicationId: 'app-1', userEmail: 'user@example.com', providerId: 'google-gmail' },
+          processedMessage: { processedMessageId: 'pm-1', providerMessageId: 'msg-1', providerThreadId: 'thread-1' } as never,
+          subject: 'Many actions',
+          from: 'sender@example.com',
+          body: '',
+          callbackBaseUrl: 'https://example.com',
+          proposals,
+        },
+        makeEnv() as never,
+      );
+
+      expect(result.length).toBeLessThanOrEqual(4);
+      expect(mockCreate).toHaveBeenCalledTimes(4);
+    });
+
+    it('creates email.draft_reply action', async () => {
+      mockDeleteByProcessedMessageId.mockResolvedValue(undefined);
+      mockCreate.mockResolvedValue(makeAction({ actionType: 'email.draft_reply' }));
+
+      const result = await ActionService.createActionsForSummary(
+        {
+          application: { applicationId: 'app-1', userEmail: 'user@example.com', providerId: 'google-gmail' },
+          processedMessage: { processedMessageId: 'pm-1', providerMessageId: 'msg-1', providerThreadId: 'thread-1' } as never,
+          subject: 'Re: Meeting',
+          from: 'boss@example.com',
+          body: '',
+          callbackBaseUrl: 'https://example.com',
+          proposals: [{
+            type: 'email.draft_reply',
+            title: 'Reply to meeting',
+            description: 'Send a reply',
+            parameters: { draftBody: 'I will be there!' },
+          }],
+        },
+        makeEnv() as never,
+      );
+
+      expect(result).toHaveLength(1);
+    });
+  });
+
+  describe('provider operations via executeActionWithToken', () => {
+    it('executes Gmail calendar.add_event action', async () => {
+      const calPayload = { type: 'calendar.add_event', eventTitle: 'Meeting', startTime: '2026-07-01T10:00:00Z', endTime: '2026-07-01T11:00:00Z', timeZone: 'UTC' };
+      const action = makeAction({ actionType: 'calendar.add_event', payload: calPayload });
+      const doneAction = makeAction({ status: 'succeeded' });
+      mockGetByTokenHash.mockResolvedValue(action);
+      mockClaimForExecution.mockResolvedValue(true);
+      mockGetById.mockResolvedValue({ applicationId: 'app-1', providerId: 'google-gmail', providerEmail: 'user@gmail.com' });
+      (GmailProviderUtil.createCalendarEvent as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'evt-1', htmlLink: 'https://cal.google.com/1' });
+      mockMarkSucceeded.mockResolvedValue(undefined);
+      mockRecordExecution.mockResolvedValue(undefined);
+      mockGetForUser.mockResolvedValue(doneAction);
+
+      const result = await ActionService.executeActionWithToken('action-1', 'token', new Request('https://example.com'), makeEnv() as never);
+
+      expect(result.statusCode).toBe(200);
+      expect(GmailProviderUtil.createCalendarEvent).toHaveBeenCalled();
+    });
+
+    it('executes Outlook calendar.add_event action', async () => {
+      const calPayload = { type: 'calendar.add_event', eventTitle: 'Meeting', startTime: '2026-07-01T10:00:00Z', endTime: '2026-07-01T11:00:00Z', timeZone: 'UTC' };
+      const action = makeAction({ actionType: 'calendar.add_event', providerId: 'microsoft-outlook', payload: calPayload });
+      const doneAction = makeAction({ status: 'succeeded' });
+      mockGetByTokenHash.mockResolvedValue(action);
+      mockClaimForExecution.mockResolvedValue(true);
+      mockGetById.mockResolvedValue({ applicationId: 'app-1', providerId: 'microsoft-outlook', providerEmail: 'user@outlook.com' });
+      (OutlookProviderUtil.createCalendarEvent as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'evt-2', webLink: 'https://outlook.com/2' });
+      mockMarkSucceeded.mockResolvedValue(undefined);
+      mockRecordExecution.mockResolvedValue(undefined);
+      mockGetForUser.mockResolvedValue(doneAction);
+
+      const result = await ActionService.executeActionWithToken('action-1', 'token', new Request('https://example.com'), makeEnv() as never);
+
+      expect(result.statusCode).toBe(200);
+      expect(OutlookProviderUtil.createCalendarEvent).toHaveBeenCalled();
+    });
+
+    it('marks action as failed when provider operation throws', async () => {
+      const calPayload = { type: 'calendar.add_event', eventTitle: 'Meeting', startTime: '2026-07-01T10:00:00Z', endTime: '2026-07-01T11:00:00Z', timeZone: 'UTC' };
+      const action = makeAction({ actionType: 'calendar.add_event', payload: calPayload });
+      const failedAction = makeAction({ status: 'failed', errorMessage: 'Calendar API error' });
+      mockGetByTokenHash.mockResolvedValue(action);
+      mockClaimForExecution.mockResolvedValue(true);
+      mockGetById.mockResolvedValue({ applicationId: 'app-1', providerId: 'google-gmail' });
+      (GmailProviderUtil.createCalendarEvent as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Calendar API error'));
+      mockMarkFailed.mockResolvedValue(undefined);
+      mockRecordExecution.mockResolvedValue(undefined);
+      mockGetForUser.mockResolvedValue(failedAction);
+
+      const result = await ActionService.executeActionWithToken('action-1', 'token', new Request('https://example.com'), makeEnv() as never);
+
+      expect(result.statusCode).toBe(200);
+      expect(mockMarkFailed).toHaveBeenCalledWith('action-1', 'Calendar API error');
+    });
+  });
+});
