@@ -211,12 +211,14 @@ class OutlookProviderUtil {
     const sinkAddress: string = atIndex !== -1
       ? `${mailboxAddress.slice(0, atIndex)}+sink${mailboxAddress.slice(atIndex)}`
       : mailboxAddress;
-    const draft = await OutlookProviderUtil.fetchJson<{ id?: string | undefined }>(
-      `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(originalMessage.id)}/createReply`,
-      accessToken,
+    const response: Response = await fetch(
+      `https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(originalMessage.id)}/reply`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           message: {
             body: {
@@ -237,21 +239,30 @@ class OutlookProviderUtil {
         }),
       },
     );
-    if (!draft.id) {
-      throw new ProviderApiRetryableError('Microsoft Graph createReply did not return a draft id.');
+    if (!response.ok) {
+      throw OutlookProviderUtil.createApiError('send summary reply', response, await response.text());
     }
-    const sendResponse: Response = await fetch(`https://graph.microsoft.com/v1.0/me/messages/${encodeURIComponent(draft.id)}/send`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
-    if (!sendResponse.ok) {
-      throw OutlookProviderUtil.createApiError('send summary', sendResponse, await sendResponse.text());
+    const sentMessageId: string = await OutlookProviderUtil.findSentSummaryMessage(accessToken);
+    await OutlookProviderUtil.copyMessage(accessToken, sentMessageId, 'inbox');
+    await OutlookProviderUtil.deleteMessage(accessToken, sentMessageId);
+  }
+
+  private static async findSentSummaryMessage(accessToken: string): Promise<string> {
+    const url: URL = new URL('https://graph.microsoft.com/v1.0/me/mailFolders/sentitems/messages');
+    url.searchParams.set(
+      '$filter',
+      `internetMessageHeaders/any(h:h/name eq 'X-Mail-Otter-Summary' and h/value eq 'true')`,
+    );
+    url.searchParams.set('$orderby', 'sentDateTime desc');
+    url.searchParams.set('$top', '1');
+    url.searchParams.set('$select', 'id');
+    const data = await OutlookProviderUtil.fetchJson<{
+      value?: Array<{ id: string }> | undefined;
+    }>(url.toString(), accessToken);
+    if (!data.value || data.value.length === 0) {
+      throw new ProviderApiRetryableError('Microsoft Graph did not return the sent summary message.');
     }
-    await OutlookProviderUtil.copyMessage(accessToken, draft.id, 'inbox');
-    await OutlookProviderUtil.deleteMessage(accessToken, draft.id);
+    return data.value[0].id;
   }
 
   public static isMessageNotFoundError(error: unknown): boolean {
