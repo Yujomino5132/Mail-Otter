@@ -171,6 +171,22 @@ When modifying `sendSelfSummaryReply` or related Outlook message-finding logic:
 - Use `contains(subject, ...)` for the `$filter` parameter
 - The `X-Mail-Otter-Summary` header is still set on outgoing messages for identification during message reads (via `$select`), just not for filtering
 
+### Outlook Summary Email Sink Flow
+
+`OutlookProviderUtil.sendSelfSummaryReply` uses a **sink-to-inbox pattern** instead of sending the summary to the user's own mailbox, to avoid noise in Sent Items and the user's normal inbox:
+
+1. **Reason**: Sending the summary directly to the user's mailbox clutters Sent Items with self-addressed messages and the summary appears as a new conversation (or as a "sent to self" item) rather than appearing inline in the original thread. Users found this confusing.
+
+2. **Sink address**: The summary is sent to `{mailboxAddress}+sink@{domain}` (the user's own mailbox with `+sink` appended before the `@`). This leverages email plus-addressing, which Gmail and M365 both support. The sink address keeps the real Inbox clean — users can filter on this address if desired.
+
+3. **Thread preservation via inbox copy**: After sending to the sink address, the sent message is **copied from Sent Items into the Inbox** using `POST /me/messages/{id}/copy` with `destinationId: inbox`. Because `createReply` inherits the original message's `conversationId`, the inbox copy appears in the correct thread as an unread message — as if the summary was a new message in that conversation.
+
+4. **Cleanup**: The sent copy is then deleted from Sent Items so the user only sees the inbox copy in context. The `DISABLE_DELETE_AFTER_SEND` env var was removed — cleanup always happens.
+
+5. **Sequence**: `createReply(with sink)` → `send` → `copy to inbox` → `delete from Sent Items`
+
+The sink derivation is done in `OutlookProviderUtil.sendSelfSummaryReply` by splitting `mailboxAddress` at the last `@` and inserting `+sink`. Callers pass the user's real email; the sink transformation is internal.
+
 ## Provider Naming
 
 - `google-gmail` / `oauth2`
