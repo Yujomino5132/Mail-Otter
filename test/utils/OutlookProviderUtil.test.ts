@@ -180,21 +180,26 @@ describe('OutlookProviderUtil', () => {
       ).rejects.toThrow('Microsoft Graph send summary reply failed (500): Reply failed');
     });
 
-    it('throws when find returns no results after reply', async () => {
+    it('throws when find returns no results after reply (all retries exhausted)', async () => {
+      // Bypass sleep delays so the test runs instantly
+      vi.spyOn(OutlookProviderUtil as unknown as { sleep: () => Promise<void> }, 'sleep').mockResolvedValue(undefined);
+
       const mockReplyResponse = new Response(null, { status: 202 });
 
       const fetchMock = vi
         .fn()
-        .mockResolvedValueOnce(mockEmptyResponse())    // inbox check
-        .mockResolvedValueOnce(mockEmptyResponse())    // sentitems check
-        .mockResolvedValueOnce(mockReplyResponse)      // reply
-        .mockResolvedValueOnce(mockEmptyResponse());   // find after reply (empty)
+        .mockResolvedValueOnce(mockEmptyResponse())                           // inbox check
+        .mockResolvedValueOnce(mockEmptyResponse())                           // sentitems check
+        .mockResolvedValueOnce(mockReplyResponse)                             // reply
+        .mockImplementation(() => Promise.resolve(mockEmptyResponse()));      // all 4 find retries (fresh body each time)
 
       vi.stubGlobal('fetch', fetchMock);
 
       await expect(
         OutlookProviderUtil.sendSelfSummaryReply('test-access-token', { id: 'original-msg-id' }, 'sender@example.com', 'Summary text'),
       ).rejects.toThrow('Microsoft Graph did not return the sent summary message.');
+
+      expect(fetchMock).toHaveBeenCalledTimes(7); // 2 idempotency + 1 reply + 4 find retries
     });
 
     it('throws when find fails after reply', async () => {

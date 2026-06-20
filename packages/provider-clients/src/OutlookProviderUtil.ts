@@ -282,12 +282,22 @@ class OutlookProviderUtil {
     return data.value && data.value.length > 0 ? data.value[0].id : null;
   }
 
+  private static sleep(ms: number): Promise<void> {
+    return new Promise<void>((resolve) => setTimeout(resolve, ms));
+  }
+
   private static async findSentSummaryMessage(accessToken: string, marker: string): Promise<string> {
-    const id: string | null = await OutlookProviderUtil.findSummaryMessageInFolder(accessToken, 'sentitems', marker);
-    if (!id) {
-      throw new ProviderApiRetryableError('Microsoft Graph did not return the sent summary message.');
+    const delays = [1000, 2000, 4000];
+    for (let attempt = 0; attempt <= delays.length; attempt++) {
+      if (attempt > 0) {
+        await OutlookProviderUtil.sleep(delays[attempt - 1]);
+      }
+      const id: string | null = await OutlookProviderUtil.findSummaryMessageInFolder(accessToken, 'sentitems', marker);
+      if (id) {
+        return id;
+      }
     }
-    return id;
+    throw new ProviderApiRetryableError('Microsoft Graph did not return the sent summary message.');
   }
 
   public static isMessageNotFoundError(error: unknown): boolean {
