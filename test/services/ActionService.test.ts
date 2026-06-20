@@ -184,7 +184,7 @@ describe('ActionService', () => {
       ]);
 
       expect(html).toContain('<ul>');
-      expect(html).toContain('Available actions');
+      expect(html).toContain('Actions');
       expect(html).toContain('</ul>');
     });
   });

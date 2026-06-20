@@ -100,7 +100,7 @@ class ActionService {
     if (actions.length === 0) return '';
     return [
       '',
-      '<p><strong>Available actions:</strong></p>',
+      '<p><strong>Actions:</strong></p>',
       '<ul>',
       ...ActionService.renderActionItems(actions),
       '</ul>',
