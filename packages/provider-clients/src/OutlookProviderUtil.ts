@@ -212,6 +212,11 @@ class OutlookProviderUtil {
     // Idempotency: if this email's summary already in Inbox, all steps completed
     const inboxMsgId: string | null = await OutlookProviderUtil.findSummaryMessageInFolder(accessToken, 'inbox', marker);
     if (inboxMsgId) {
+      // Clean up any leftover Sent Items copy if a previous delete attempt failed
+      const staleSentMsgId: string | null = await OutlookProviderUtil.findSummaryMessageInFolder(accessToken, 'sentitems', marker);
+      if (staleSentMsgId) {
+        await OutlookProviderUtil.deleteMessage(accessToken, staleSentMsgId);
+      }
       return;
     }
 

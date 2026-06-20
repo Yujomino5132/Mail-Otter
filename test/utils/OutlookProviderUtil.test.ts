@@ -106,12 +106,13 @@ describe('OutlookProviderUtil', () => {
       );
     });
 
-    it('skips when summary already exists in inbox', async () => {
+    it('skips when summary already exists in inbox and no stale sent copy', async () => {
       const mockInboxResponse = new Response(JSON.stringify({ value: [{ id: 'inbox-msg-id' }] }), { status: 200 });
 
       const fetchMock = vi
         .fn()
-        .mockResolvedValueOnce(mockInboxResponse);
+        .mockResolvedValueOnce(mockInboxResponse)   // inbox check (found)
+        .mockResolvedValueOnce(mockEmptyResponse()); // sentitems check (empty)
 
       vi.stubGlobal('fetch', fetchMock);
 
@@ -122,10 +123,38 @@ describe('OutlookProviderUtil', () => {
         'Summary text',
       );
 
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
       const inboxUrl = fetchMock.mock.calls[0][0] as string;
       expect(inboxUrl).toContain('/me/mailFolders/inbox/messages');
       expect(inboxUrl).toContain(encodeURIComponent(`[OtterSum-${EXPECTED_MARKER}]`));
+    });
+
+    it('deletes stale Sent Items copy when summary already exists in inbox', async () => {
+      const mockInboxResponse = new Response(JSON.stringify({ value: [{ id: 'inbox-msg-id' }] }), { status: 200 });
+      const mockSentItemsResponse = new Response(JSON.stringify({ value: [{ id: 'stale-sent-id' }] }), { status: 200 });
+      const mockDeleteResponse = new Response(null, { status: 204 });
+
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(mockInboxResponse)     // inbox check (found)
+        .mockResolvedValueOnce(mockSentItemsResponse) // sentitems check (stale copy found)
+        .mockResolvedValueOnce(mockDeleteResponse);   // delete stale copy
+
+      vi.stubGlobal('fetch', fetchMock);
+
+      await OutlookProviderUtil.sendSelfSummaryReply(
+        'test-access-token',
+        { id: 'original-msg-id' },
+        'sender@example.com',
+        'Summary text',
+      );
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        3,
+        'https://graph.microsoft.com/v1.0/me/messages/stale-sent-id',
+        expect.objectContaining({ method: 'DELETE' }),
+      );
     });
 
     it('skips reply and only copies and deletes when summary already in sent items', async () => {
