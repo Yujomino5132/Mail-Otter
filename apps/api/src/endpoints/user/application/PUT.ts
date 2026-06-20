@@ -31,8 +31,8 @@ interface UpdateApplicationRequest extends IRequest {
   displayName: string;
   providerId: 'google-gmail' | 'microsoft-outlook';
   connectionMethod: typeof CONNECTION_METHOD_OAUTH2;
-  clientId: string;
-  clientSecret: string;
+  clientId?: string | undefined;
+  clientSecret?: string | undefined;
   gmailPubsubTopicName?: string | undefined;
   enabledFeatures?: string[] | undefined;
 }

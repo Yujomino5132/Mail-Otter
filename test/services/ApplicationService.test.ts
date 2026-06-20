@@ -165,6 +165,26 @@ describe('ApplicationService', () => {
         ),
       ).rejects.toThrow('Provider and connection method cannot be changed after creation.');
     });
+
+    it('preserves existing credentials when clientId and clientSecret are omitted', async () => {
+      mockGetByIdForUser.mockResolvedValue({
+        applicationId: 'app-1',
+        providerId: 'google-gmail',
+        connectionMethod: 'oauth2',
+        credentials: { clientId: 'existing-cid', clientSecret: 'existing-cs', refreshToken: 'rt' },
+      });
+      mockUpdateForUser.mockResolvedValue({ applicationId: 'app-1' });
+
+      await ApplicationService.updateUserApplication(
+        'user@example.com',
+        { applicationId: 'app-1', displayName: 'Updated', providerId: 'google-gmail', connectionMethod: 'oauth2' },
+        makeEnv(),
+        new Request('https://example.com'),
+      );
+
+      const [, , , calledCredentials] = mockUpdateForUser.mock.calls[0] as [unknown, unknown, unknown, { clientId: string; clientSecret: string; refreshToken: string }];
+      expect(calledCredentials).toEqual({ clientId: 'existing-cid', clientSecret: 'existing-cs', refreshToken: 'rt' });
+    });
   });
 
   describe('updateWatchedFolderIds', () => {

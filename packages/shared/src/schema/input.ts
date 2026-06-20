@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { ZodTypeAny } from 'zod';
-import { ConnectedApplicationBaseSchema, UuidSchema, nonEmptyStringSchema } from './common';
+import { ConnectedApplicationBaseSchema, GmailPubsubTopicNameSchema, ProviderIdSchema, ConnectionMethodSchema, UuidSchema, nonEmptyStringSchema } from './common';
 import {
   APPLICATION_CONTEXT_DOCUMENT_STATUS_ACTIVE,
   APPLICATION_CONTEXT_DOCUMENT_STATUS_DELETED,
@@ -11,6 +11,8 @@ import {
   EMAIL_ACTION_STATUS_FAILED,
   EMAIL_ACTION_STATUS_PENDING,
   EMAIL_ACTION_STATUS_SUCCEEDED,
+  PROVIDER_GOOGLE_GMAIL,
+  SUPPORTED_PROVIDER_CONNECTIONS,
 } from '../constants';
 
 interface RequestInputSchema {
@@ -20,9 +22,25 @@ interface RequestInputSchema {
 
 const CreateApplicationBodySchema = ConnectedApplicationBaseSchema;
 
-const UpdateApplicationBodySchema = ConnectedApplicationBaseSchema.extend({
-  applicationId: UuidSchema,
-});
+const UpdateApplicationBodySchema = z
+  .object({
+    applicationId: UuidSchema,
+    displayName: nonEmptyStringSchema('displayName', 128),
+    providerId: ProviderIdSchema,
+    connectionMethod: ConnectionMethodSchema,
+    clientId: z.string().max(512).optional(),
+    clientSecret: z.string().max(2048).optional(),
+    gmailPubsubTopicName: GmailPubsubTopicNameSchema.optional(),
+    enabledFeatures: z.array(z.string()).optional(),
+  })
+  .refine(
+    (input): boolean => SUPPORTED_PROVIDER_CONNECTIONS[input.providerId] === input.connectionMethod,
+    'providerId and connectionMethod are not a supported combination.',
+  )
+  .refine(
+    (input): boolean => input.providerId !== PROVIDER_GOOGLE_GMAIL || Boolean(input.gmailPubsubTopicName),
+    'gmailPubsubTopicName is required for Gmail applications.',
+  );
 
 const DeleteApplicationBodySchema = z.object({
   applicationId: UuidSchema,

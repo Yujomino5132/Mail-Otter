@@ -160,8 +160,8 @@ export default function SpaApp() {
         displayName: applicationForm.displayName,
         providerId: applicationForm.providerId,
         connectionMethod: providerMethod[applicationForm.providerId],
-        clientId: applicationForm.clientId,
-        clientSecret: applicationForm.clientSecret,
+        ...(applicationForm.clientId ? { clientId: applicationForm.clientId } : {}),
+        ...(applicationForm.clientSecret ? { clientSecret: applicationForm.clientSecret } : {}),
         enabledFeatures: applicationForm.enabledFeatures,
         ...(applicationForm.providerId === 'google-gmail' ? { gmailPubsubTopicName: applicationForm.gmailPubsubTopicName } : {}),
       };

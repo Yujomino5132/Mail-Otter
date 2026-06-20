@@ -68,10 +68,11 @@ class ApplicationService {
       throw new BadRequestError('Provider and connection method cannot be changed after creation.');
     }
 
+    const existingOAuth2 = existing.credentials as OAuth2Credentials;
     const credentials: ConnectedApplicationCredentials = {
-      clientId: input.clientId,
-      clientSecret: input.clientSecret,
-      refreshToken: (existing.credentials as OAuth2Credentials).refreshToken,
+      clientId: input.clientId || existingOAuth2.clientId,
+      clientSecret: input.clientSecret || existingOAuth2.clientSecret,
+      refreshToken: existingOAuth2.refreshToken,
     };
     const application: ConnectedApplicationMetadata | undefined = await applicationDAO.updateForUser(
       input.applicationId,
@@ -137,9 +138,11 @@ interface CreateUserApplicationInput {
   enabledFeatures?: string[] | null | undefined;
 }
 
-interface UpdateUserApplicationInput extends CreateUserApplicationInput {
+interface UpdateUserApplicationInput extends Omit<CreateUserApplicationInput, 'clientId' | 'clientSecret'> {
   applicationId: string;
   connectionMethod: typeof CONNECTION_METHOD_OAUTH2;
+  clientId?: string | undefined;
+  clientSecret?: string | undefined;
 }
 
 interface ApplicationServiceEnv {
