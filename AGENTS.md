@@ -202,13 +202,20 @@ All user-visible text in `apps/web/` must use **Title Case** (capitalize the fir
 - Form labels, placeholders, and input hints
 - Empty-state messages, error/success toast notifications, and confirm dialog text
 - Tooltip `title` attributes, `aria-label` values, and `<option>` text
-- Inline metric labels and status suffixes
 
-**Exceptions — do not Title Case:**
-- Text already in ALL CAPS (e.g., from CSS `text-transform: uppercase`)
+**Never hardcode ALL CAPS strings directly in JSX.** When a UI element needs to render in ALL CAPS, achieve it through CSS (`uppercase` Tailwind class / `text-transform: uppercase`), not by writing uppercase text in source. Four components already do this — write their labels/props in Title Case and the CSS handles visual rendering:
+
+| Component | File | Affected prop / children |
+|---|---|---|
+| `Metric` | `apps/web/src/components/shared/Metric.tsx` | `label` prop |
+| `SenderFilterSection` label | `apps/web/src/components/mailboxes/SenderFilterSection.tsx` | section label string |
+| `AuditLogsModal` event type span | `apps/web/src/components/modals/AuditLogsModal.tsx` | `log.eventType` (API value — no conversion needed) |
+| `ContextDocumentRow` `AuditValue` label | `apps/web/src/components/context/ContextDocumentRow.tsx` | `label` prop |
+
+**Exceptions — do not apply Title Case:**
 - Content inside `<code>` tags (e.g., `@domain.com`, technical format strings)
 - Technical URI/path placeholders (e.g., `projects/{projectId}/topics/{topicName}`)
-- Dynamic content from API responses (provider names, user-supplied data)
+- Dynamic content from API responses (provider names, user-supplied data, raw event types)
 
 ## Test Coverage History
 
