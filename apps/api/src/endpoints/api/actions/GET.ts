@@ -20,7 +20,7 @@ class GetActionConfirmationRoute extends IBaseRoute<GetActionConfirmationRequest
   ): Promise<ExtendedResponse<GetActionConfirmationResponse>> {
     const actionId: string | undefined = cxt.req.param('actionId');
     if (!actionId) throw new BadRequestError('Action callback is missing actionId.');
-    const token: string = new URL(request.raw.url).searchParams.get('token') || '';
+    const token: string = this.getQueryParam(request, 'token') ?? '';
     const response: ActionHtmlResponse = await ActionService.getConfirmationResponse(actionId, token, env);
     return { statusCode: response.statusCode as 200, headers: { 'Content-Type': 'text/html; charset=utf-8' }, rawBody: response.html };
   }

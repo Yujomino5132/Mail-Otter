@@ -1,6 +1,8 @@
 import { ContentfulStatusCode } from 'hono/utils/http-status';
 
-abstract class IServiceError extends Error {
+abstract class ServiceError extends Error {
+  public retryable: boolean = false;
+
   public abstract getErrorCode(): ErrorCode;
 
   public abstract getErrorType(): string;
@@ -10,5 +12,6 @@ abstract class IServiceError extends Error {
 
 type ErrorCode = ContentfulStatusCode;
 
-export { IServiceError };
+export { ServiceError };
+export { ServiceError as IServiceError };
 export type { ErrorCode };

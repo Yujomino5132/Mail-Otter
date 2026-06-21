@@ -1,4 +1,4 @@
-export { IServiceError } from './IServiceError';
+export { ServiceError, IServiceError } from './IServiceError';
 export { BadRequestError } from './BadRequestError';
 export { DatabaseError } from './DatabaseError';
 export {

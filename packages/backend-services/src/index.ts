@@ -4,4 +4,5 @@ export * from './action';
 export * from './email';
 export * from './oauth2';
 export * from './subscription';
+export * from './user';
 export * from './webhook';

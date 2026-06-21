@@ -21,7 +21,7 @@ class OutlookWebhookRoute extends IBaseRoute<OutlookWebhookRequest, OutlookWebho
     env: OutlookWebhookEnv,
     cxt: RouteContext<OutlookWebhookEnv>,
   ): Promise<OutlookWebhookResponse | ExtendedResponse<OutlookWebhookResponse>> {
-    const validationToken: string | null = new URL(request.raw.url).searchParams.get('validationToken');
+    const validationToken = this.getQueryParam(request, 'validationToken');
     if (validationToken) {
       return {
         statusCode: 200,

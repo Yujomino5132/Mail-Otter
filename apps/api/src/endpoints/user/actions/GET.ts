@@ -18,13 +18,12 @@ class ListEmailActionsRoute extends IUserRoute<ListEmailActionsRequest, ListEmai
     env: ListEmailActionsEnv,
     cxt: RouteContext<ListEmailActionsEnv>,
   ): Promise<ListEmailActionsResponse> {
-    const url = new URL(request.raw.url);
     return ActionService.listActionsForUser(
       this.getAuthenticatedUserEmailAddress(cxt),
       {
-        applicationId: url.searchParams.get('applicationId') || undefined,
-        status: (url.searchParams.get('status') || undefined) as EmailActionStatus | undefined,
-        cursor: url.searchParams.get('cursor') || undefined,
+        applicationId: this.getQueryParam(request, 'applicationId'),
+        status: this.getQueryParam(request, 'status') as EmailActionStatus | undefined,
+        cursor: this.getQueryParam(request, 'cursor'),
       },
       env,
     );

@@ -23,7 +23,7 @@ class GmailWebhookRoute extends IBaseRoute<GmailWebhookRequest, GmailWebhookResp
   ): Promise<GmailWebhookResponse> {
     const applicationId: string | undefined = cxt.req.param('applicationId');
     if (!applicationId) throw new BadRequestError('Gmail webhook is missing applicationId.');
-    const token: string | null = new URL(request.raw.url).searchParams.get('token');
+    const token: string | null = this.getQueryParam(request, 'token') ?? null;
     await GmailWebhookService.handleNotification(
       {
         applicationId,

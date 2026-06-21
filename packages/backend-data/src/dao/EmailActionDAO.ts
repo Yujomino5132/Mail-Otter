@@ -6,7 +6,7 @@ import {
   EMAIL_ACTION_STATUS_SUCCEEDED,
 } from '@mail-otter/shared/constants';
 import { decryptDataWithSalt, encryptDataWithSalt } from '../crypto';
-import { executeD1WithRetry } from '../utils';
+import { CursorUtil, executeD1WithRetry } from '../utils';
 import type { D1Queryable } from '../utils';
 import type {
   EmailAction,
@@ -407,18 +407,13 @@ class EmailActionDAO {
   }
 
   private static encodeCursor(updatedAt: number, createdAt: number): string {
-    return btoa(JSON.stringify({ updatedAt, createdAt }));
+    return CursorUtil.encode({ updatedAt, createdAt });
   }
 
   private static parseCursor(cursor: string | undefined): { updatedAt: number; createdAt: number } | undefined {
-    if (!cursor) return undefined;
-    try {
-      const parsed = JSON.parse(atob(cursor)) as { updatedAt?: unknown; createdAt?: unknown };
-      if (typeof parsed.updatedAt === 'number' && typeof parsed.createdAt === 'number') {
-        return { updatedAt: parsed.updatedAt, createdAt: parsed.createdAt };
-      }
-    } catch {
-      return undefined;
+    const parsed = CursorUtil.decode<{ updatedAt?: unknown; createdAt?: unknown }>(cursor);
+    if (parsed && typeof parsed.updatedAt === 'number' && typeof parsed.createdAt === 'number') {
+      return { updatedAt: parsed.updatedAt, createdAt: parsed.createdAt };
     }
     return undefined;
   }

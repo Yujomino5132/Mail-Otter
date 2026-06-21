@@ -101,6 +101,6 @@ describe('FolderService', () => {
 
     await expect(
       FolderService.listFolders('user@example.com', 'app-1', makeEnv()),
-    ).rejects.toThrow('Unsupported provider.');
+    ).rejects.toThrow('Unsupported provider');
   });
 });

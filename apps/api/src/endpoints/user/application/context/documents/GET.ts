@@ -24,11 +24,10 @@ class ListApplicationContextDocumentsRoute extends IUserRoute<
     env: ListApplicationContextDocumentsEnv,
     cxt: RouteContext<ListApplicationContextDocumentsEnv>,
   ): Promise<ListApplicationContextDocumentsResponse> {
-    const url = new URL(request.raw.url);
     return ContextService.listDocuments(this.getAuthenticatedUserEmailAddress(cxt), {
-      applicationId: url.searchParams.get('applicationId') || undefined,
-      status: (url.searchParams.get('status') || undefined) as ApplicationContextDocumentStatus | undefined,
-      cursor: url.searchParams.get('cursor') || undefined,
+      applicationId: this.getQueryParam(request, 'applicationId'),
+      status: this.getQueryParam(request, 'status') as ApplicationContextDocumentStatus | undefined,
+      cursor: this.getQueryParam(request, 'cursor'),
     }, env);
   }
 }

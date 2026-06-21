@@ -23,13 +23,12 @@ class OAuth2CallbackRoute extends IBaseRoute<OAuth2CallbackRequest, OAuth2Callba
     if (!applicationId) {
       throw new BadRequestError('OAuth2 callback is missing applicationId.');
     }
-    const url: URL = new URL(request.raw.url);
-    const error: string | null = url.searchParams.get('error');
+    const error = this.getQueryParam(request, 'error');
     if (error) {
       return this.redirect(`/user/?oauth2=error&message=${encodeURIComponent(error)}`);
     }
-    const code: string | null = url.searchParams.get('code');
-    const state: string | null = url.searchParams.get('state');
+    const code = this.getQueryParam(request, 'code') ?? null;
+    const state = this.getQueryParam(request, 'state') ?? null;
     if (!code || !state) {
       throw new BadRequestError('OAuth2 callback is missing code or state.');
     }

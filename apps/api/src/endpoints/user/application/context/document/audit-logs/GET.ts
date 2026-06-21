@@ -29,9 +29,8 @@ class ListContextDocumentAuditLogsRoute extends IUserRoute<
       throw new BadRequestError('Context document id is required.');
     }
 
-    const url = new URL(_request.raw.url);
     const userEmail: string = this.getAuthenticatedUserEmailAddress(cxt);
-    return ContextService.listAuditLogs(userEmail, contextDocumentId, env, url.searchParams.get('cursor') || undefined);
+    return ContextService.listAuditLogs(userEmail, contextDocumentId, env, this.getQueryParam(_request, 'cursor'));
   }
 }
 

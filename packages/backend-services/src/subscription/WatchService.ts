@@ -8,6 +8,7 @@ import { TimestampUtil } from '@mail-otter/shared/utils';
 import { GmailProviderUtil } from '@mail-otter/provider-clients/gmail';
 import { OutlookProviderUtil } from '@mail-otter/provider-clients/outlook';
 import { WebhookSecurityUtil } from '@mail-otter/provider-clients/webhook';
+import { EmailProviderRegistry } from '../provider/EmailProviderRegistry';
 import { OAuth2AccessTokenService } from '../oauth2/OAuth2AccessTokenService';
 
 class WatchService {
@@ -42,11 +43,7 @@ class WatchService {
     const subscription: ProviderSubscription | undefined = await subscriptionDAO.getByApplication(application.applicationId);
     const accessToken: string = await OAuth2AccessTokenService.getAccessToken(application.applicationId, env);
     try {
-      if (application.providerId === PROVIDER_GOOGLE_GMAIL) {
-        await GmailProviderUtil.stopWatch(accessToken);
-      } else if (application.providerId === PROVIDER_MICROSOFT_OUTLOOK && subscription?.externalSubscriptionId) {
-        await OutlookProviderUtil.deleteSubscription(accessToken, subscription.externalSubscriptionId);
-      }
+      await EmailProviderRegistry.get(application.providerId).stopWatch(accessToken, subscription?.externalSubscriptionId ?? undefined);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[WatchService] Provider unsubscribe failed, proceeding with local stop: ${message}`);

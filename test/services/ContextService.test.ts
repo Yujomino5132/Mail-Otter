@@ -394,7 +394,7 @@ describe('ContextService', () => {
       mockGetMetadataByIdForUser.mockResolvedValue({ applicationId: 'app-1', providerEmail: null });
 
       await expect(ContextService.getDocumentProviderLink('user@example.com', 'doc-1', makeEnv())).rejects.toThrow(
-        'Unsupported context document provider.',
+        'Unsupported provider',
       );
     });
   });

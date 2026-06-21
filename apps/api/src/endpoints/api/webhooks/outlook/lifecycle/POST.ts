@@ -23,7 +23,7 @@ class OutlookLifecycleWebhookRoute extends IBaseRoute<
     env: OutlookLifecycleWebhookEnv,
     cxt: RouteContext<OutlookLifecycleWebhookEnv>,
   ): Promise<OutlookLifecycleWebhookResponse | ExtendedResponse<OutlookLifecycleWebhookResponse>> {
-    const validationToken: string | null = new URL(request.raw.url).searchParams.get('validationToken');
+    const validationToken = this.getQueryParam(request, 'validationToken');
     if (validationToken) {
       return {
         statusCode: 200,

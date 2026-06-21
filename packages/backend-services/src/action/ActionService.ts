@@ -11,15 +11,11 @@ import {
   EMAIL_ACTION_TYPE_EMAIL_DRAFT_REPLY,
   EMAIL_ACTION_TYPE_EXTERNAL_OPEN_LINK,
   EMAIL_ACTION_TYPE_MANUAL_TODO,
-  PROVIDER_GOOGLE_GMAIL,
-  PROVIDER_MICROSOFT_OUTLOOK,
 } from '@mail-otter/shared/constants';
 import { ConnectedApplicationDAO, EmailActionDAO } from '@mail-otter/backend-data/dao';
 import type { D1Queryable } from '@mail-otter/backend-data/utils';
 import { BadRequestError } from '@mail-otter/backend-errors';
 import { ConfigurationManager } from '@mail-otter/backend-runtime/config';
-import { GmailProviderUtil } from '@mail-otter/provider-clients/gmail';
-import { OutlookProviderUtil } from '@mail-otter/provider-clients/outlook';
 import type {
   CalendarAddEventActionPayload,
   ConnectedApplication,
@@ -36,6 +32,7 @@ import type {
 } from '@mail-otter/shared/model';
 import type { EmailActionExecutionTrigger, EmailActionRiskLevel, EmailActionStatus, EmailActionType } from '@mail-otter/shared/constants';
 import { CryptoUtil, TimestampUtil, UUIDUtil } from '@mail-otter/shared/utils';
+import { EmailProviderRegistry } from '../provider/EmailProviderRegistry';
 import { OAuth2AccessTokenService } from '../oauth2/OAuth2AccessTokenService';
 
 const MAX_ACTIONS_PER_SUMMARY = 4;
@@ -233,23 +230,7 @@ class ActionService {
 
   private static async executeCalendarAction(action: EmailAction, accessToken: string): Promise<EmailActionResult> {
     const payload = action.payload as CalendarAddEventActionPayload;
-    if (action.providerId === PROVIDER_GOOGLE_GMAIL) {
-      const result = await GmailProviderUtil.createCalendarEvent(accessToken, payload);
-      return {
-        summary: 'Calendar event created.',
-        providerOperationId: result.id,
-        providerUrl: result.htmlLink,
-      };
-    }
-    if (action.providerId === PROVIDER_MICROSOFT_OUTLOOK) {
-      const result = await OutlookProviderUtil.createCalendarEvent(accessToken, payload);
-      return {
-        summary: 'Calendar event created.',
-        providerOperationId: result.id,
-        providerUrl: result.webLink,
-      };
-    }
-    throw new BadRequestError('Unsupported calendar provider.');
+    return EmailProviderRegistry.get(action.providerId).createCalendarEvent(accessToken, payload);
   }
 
   private static async executeDraftReplyAction(
@@ -258,29 +239,8 @@ class ActionService {
     application: ConnectedApplication,
   ): Promise<EmailActionResult> {
     const payload = action.payload as EmailDraftReplyActionPayload;
-    if (action.providerId === PROVIDER_GOOGLE_GMAIL) {
-      const message = await GmailProviderUtil.getMessage(accessToken, action.providerMessageId);
-      const result = await GmailProviderUtil.createDraftReply(
-        accessToken,
-        application.providerEmail || application.userEmail,
-        message,
-        payload.draftBody,
-        payload.draftSubject,
-      );
-      return {
-        summary: 'Draft reply created.',
-        providerOperationId: result.id || result.message?.id,
-      };
-    }
-    if (action.providerId === PROVIDER_MICROSOFT_OUTLOOK) {
-      const result = await OutlookProviderUtil.createDraftReply(accessToken, action.providerMessageId, payload.draftBody);
-      return {
-        summary: 'Draft reply created.',
-        providerOperationId: result.id,
-        providerUrl: result.webLink,
-      };
-    }
-    throw new BadRequestError('Unsupported draft provider.');
+    const fromEmail = application.providerEmail || application.userEmail;
+    return EmailProviderRegistry.get(action.providerId).createDraftReply(accessToken, action.providerMessageId, fromEmail, payload);
   }
 
   private static normalizeProposal(

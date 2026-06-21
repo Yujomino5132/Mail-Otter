@@ -1,8 +1,6 @@
 import {
   APPLICATION_CONTEXT_DELETION_STATUS_ACCEPTED,
   APPLICATION_CONTEXT_DELETION_STATUS_ERROR,
-  PROVIDER_GOOGLE_GMAIL,
-  PROVIDER_MICROSOFT_OUTLOOK,
   CONTEXT_AUDIT_EVENT_DOCUMENT_DELETED,
   CONTEXT_AUDIT_LOG_SEVERITY_INFO,
 } from '@mail-otter/shared/constants';
@@ -20,6 +18,7 @@ import type {
 import type { ApplicationContextDocumentStatus } from '@mail-otter/shared/constants';
 import { ApplicationResponseUtil } from '../application/ApplicationResponseUtil';
 import type { ApplicationResponse } from '../application/ApplicationResponseUtil';
+import { EmailProviderRegistry } from '../provider/EmailProviderRegistry';
 import { EmailContextUtil } from './EmailContextUtil';
 
 class ContextService {
@@ -217,20 +216,7 @@ class ContextService {
   }
 
   private static getProviderUrl(document: ApplicationContextDocumentSource, application: ConnectedApplicationMetadata): string {
-    if (document.sourceProviderId === PROVIDER_GOOGLE_GMAIL) {
-      const url = new URL('https://mail.google.com/mail/u/');
-      if (application.providerEmail) url.searchParams.set('authuser', application.providerEmail);
-      url.hash = `all/${document.sourceThreadId || document.sourceDocumentId}`;
-      return url.toString();
-    }
-
-    if (document.sourceProviderId === PROVIDER_MICROSOFT_OUTLOOK) {
-      const url = new URL(`https://outlook.office.com/mail/deeplink/read/${encodeURIComponent(document.sourceDocumentId)}`);
-      if (application.providerEmail) url.searchParams.set('login_hint', application.providerEmail);
-      return url.toString();
-    }
-
-    throw new BadRequestError('Unsupported context document provider.');
+    return EmailProviderRegistry.get(document.sourceProviderId).getProviderUrl(document, application);
   }
 }
 

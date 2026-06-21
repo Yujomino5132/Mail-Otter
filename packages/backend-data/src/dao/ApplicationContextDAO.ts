@@ -7,7 +7,7 @@ import {
   SOURCE_TYPE_EMAIL,
 } from '@mail-otter/shared/constants';
 import { DatabaseError } from '@mail-otter/backend-errors';
-import { executeD1WithRetry } from '../utils';
+import { CursorUtil, executeD1WithRetry } from '../utils';
 import type { D1Queryable } from '../utils';
 import type {
   ApplicationContextDeletionRun,
@@ -743,57 +743,39 @@ class ApplicationContextDAO {
   }
 
   private static parseDocumentCursor(cursor: string | undefined): { updatedAt: number; createdAt: number } | undefined {
-    if (!cursor) return undefined;
-    try {
-      const decoded: string = atob(cursor);
-      const parsed: unknown = JSON.parse(decoded);
-      if (Array.isArray(parsed) && parsed.length === 2 && typeof parsed[0] === 'number' && typeof parsed[1] === 'number') {
-        return { updatedAt: parsed[0], createdAt: parsed[1] };
-      }
-      return undefined;
-    } catch {
-      return undefined;
+    const parsed = CursorUtil.decode<unknown[]>(cursor);
+    if (Array.isArray(parsed) && parsed.length === 2 && typeof parsed[0] === 'number' && typeof parsed[1] === 'number') {
+      return { updatedAt: parsed[0], createdAt: parsed[1] };
     }
+    return undefined;
   }
 
   private static encodeDocumentCursor(updatedAt: number, createdAt: number): string {
-    return btoa(JSON.stringify([updatedAt, createdAt]));
+    return CursorUtil.encode([updatedAt, createdAt]);
   }
 
   private static parseDeletionRunCursor(cursor: string | undefined): { createdAt: number } | undefined {
-    if (!cursor) return undefined;
-    try {
-      const decoded: string = atob(cursor);
-      const parsed: unknown = JSON.parse(decoded);
-      if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'number') {
-        return { createdAt: parsed[0] };
-      }
-      return undefined;
-    } catch {
-      return undefined;
+    const parsed = CursorUtil.decode<unknown[]>(cursor);
+    if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'number') {
+      return { createdAt: parsed[0] };
     }
+    return undefined;
   }
 
   private static encodeDeletionRunCursor(createdAt: number): string {
-    return btoa(JSON.stringify([createdAt]));
+    return CursorUtil.encode([createdAt]);
   }
 
   private static parseAuditLogCursor(cursor: string | undefined): { createdAt: number } | undefined {
-    if (!cursor) return undefined;
-    try {
-      const decoded: string = atob(cursor);
-      const parsed: unknown = JSON.parse(decoded);
-      if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'number') {
-        return { createdAt: parsed[0] };
-      }
-      return undefined;
-    } catch {
-      return undefined;
+    const parsed = CursorUtil.decode<unknown[]>(cursor);
+    if (Array.isArray(parsed) && parsed.length === 1 && typeof parsed[0] === 'number') {
+      return { createdAt: parsed[0] };
     }
+    return undefined;
   }
 
   private static encodeAuditLogCursor(createdAt: number): string {
-    return btoa(JSON.stringify([createdAt]));
+    return CursorUtil.encode([createdAt]);
   }
 
   private static parseAuditLogEventData(value: string | null): unknown | null {
