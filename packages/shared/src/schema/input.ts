@@ -106,6 +106,10 @@ const ApplicationFoldersQuerySchema = z.object({
   applicationId: UuidSchema,
 });
 
+const ApplicationIntegrationsQuerySchema = z.object({
+  applicationId: UuidSchema,
+});
+
 const UpdateApplicationWatchSettingsBodySchema = z.object({
   applicationId: UuidSchema,
   folderIds: z.array(nonEmptyStringSchema('folderIds', 512)).nullable(),
@@ -176,6 +180,7 @@ const RequestInputSchemas: Record<string, RequestInputSchema> = {
   'POST /user/actions/:actionId/execute': {},
   'POST /user/application/oauth2/authorize': { body: OAuth2AuthorizeBodySchema },
   'GET /user/application/folders': { query: ApplicationFoldersQuerySchema },
+  'GET /user/application/integrations': { query: ApplicationIntegrationsQuerySchema },
   'PUT /user/application/watch-settings': { body: UpdateApplicationWatchSettingsBodySchema },
   'POST /user/application/watch': { body: WatchApplicationBodySchema },
   'POST /user/application/stop': { body: StopApplicationBodySchema },
