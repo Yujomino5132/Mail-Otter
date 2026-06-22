@@ -21,16 +21,14 @@ class ListIntegrationsRoute extends IUserRoute<ListIntegrationsRequest, ListInte
   ): Promise<ListIntegrationsResponse> {
     const integrations = await ApplicationService.listIntegrations(
       this.getAuthenticatedUserEmailAddress(cxt),
-      request.applicationId,
+      this.getQueryParam(request, 'applicationId') ?? '',
       env,
     );
     return { integrations };
   }
 }
 
-interface ListIntegrationsRequest extends IRequest {
-  applicationId: string;
-}
+type ListIntegrationsRequest = IRequest;
 
 interface ListIntegrationsResponse extends IResponse {
   integrations: OutboundIntegration[];
