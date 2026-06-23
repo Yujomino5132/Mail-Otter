@@ -124,6 +124,7 @@ jobs:
     name: Auto-Merge Dependabot PR
     needs:
       - checks
+      - integration-tests
       - build
     permissions:
       contents: write
