@@ -54,6 +54,7 @@ jobs:
           max_attempts: '3'
         env:
           WRANGLER_JSONC: ${{ vars.WRANGLER_JSONC }}
+          WRANGLER_PATCH_JSON: ${{ vars.WRANGLER_PATCH_JSON }}
           WRANGLER_VARS_PATCH_JSON: ${{ vars.WRANGLER_VARS_PATCH_JSON }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

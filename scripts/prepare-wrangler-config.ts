@@ -81,6 +81,43 @@ function writeConfigValue(content: string, path: Array<string | number>, value: 
   return applyEdits(content, edits);
 }
 
+function parseTopLevelPatch(): Record<string, unknown> | undefined {
+  const rawPatch = process.env.WRANGLER_PATCH_JSON;
+  if (!rawPatch?.trim()) {
+    return undefined;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawPatch) as unknown;
+  } catch {
+    throw new Error('WRANGLER_PATCH_JSON must be a valid JSON object.');
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('WRANGLER_PATCH_JSON must be a JSON object.');
+  }
+
+  return parsed as Record<string, unknown>;
+}
+
+function applyTopLevelPatch(): void {
+  const patch = parseTopLevelPatch();
+  const patchEntries = Object.entries(patch ?? {});
+  if (patchEntries.length === 0) {
+    return;
+  }
+
+  let { content } = readConfig();
+
+  for (const [key, value] of patchEntries) {
+    content = writeConfigValue(content, [key], value);
+  }
+
+  writeFileSync(CONFIG_PATH, content.endsWith('\n') ? content : `${content}\n`);
+  console.log(`Applied ${patchEntries.length} Wrangler top-level patch entr${patchEntries.length === 1 ? 'y' : 'ies'}.`);
+}
+
 function parseVarsPatch(): Record<string, string> | undefined {
   const rawPatch = process.env.WRANGLER_VARS_PATCH_JSON;
   if (!rawPatch?.trim()) {
@@ -353,6 +390,7 @@ function provisionWranglerResources(): void {
 }
 
 prepareConfigFile();
+applyTopLevelPatch();
 applyVarsPatch();
 provisionWranglerResources();
 console.log('Wrangler configuration is ready.');
