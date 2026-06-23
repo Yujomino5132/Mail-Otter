@@ -32,8 +32,9 @@ class OutlookEmailProvider implements IEmailProvider {
     if (credentials.type !== 'oauth2') throw new BadRequestError('Outlook requires OAuth2 credentials.');
     if (!input.clientState) throw new BadRequestError('clientState is required to start an Outlook subscription.');
     if (!input.expiresAt) throw new BadRequestError('expiresAt is required to start an Outlook subscription.');
-    const notificationUrl = `${input.baseUrl}/api/webhooks/outlook/__APPLICATION_ID__`;
-    const lifecycleNotificationUrl = `${input.baseUrl}/api/webhooks/outlook/lifecycle/__APPLICATION_ID__`;
+    const appId = input.applicationId ?? '__APPLICATION_ID__';
+    const notificationUrl = `${input.baseUrl}/api/webhooks/outlook/${appId}`;
+    const lifecycleNotificationUrl = `${input.baseUrl}/api/webhooks/outlook/lifecycle/${appId}`;
     const graphSubscription = await OutlookProviderUtil.createInboxSubscription(
       credentials.accessToken,
       notificationUrl,

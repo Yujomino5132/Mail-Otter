@@ -138,6 +138,14 @@ describe('WatchService', () => {
 
       expect(result.message).toContain('Outlook subscription started');
       expect(result.webhookUrl).toContain('/api/webhooks/outlook/app-1');
+      expect(OutlookProviderUtil.createInboxSubscription).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.stringContaining('/api/webhooks/outlook/app-1'),
+        expect.stringContaining('/api/webhooks/outlook/lifecycle/app-1'),
+        expect.any(String),
+        expect.any(Number),
+        undefined,
+      );
     });
 
     it('throws when application not connected', async () => {

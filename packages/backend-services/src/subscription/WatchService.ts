@@ -37,6 +37,7 @@ class WatchService {
 
     const result = await provider.startWatch(credentials, {
       baseUrl,
+      applicationId,
       watchedFolderIds: application.watchedFolders?.map((f) => f.id),
       gmailPubsubTopicName: application.gmailPubsubTopicName ?? undefined,
       clientState,

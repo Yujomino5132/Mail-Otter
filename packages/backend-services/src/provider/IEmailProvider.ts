@@ -24,6 +24,7 @@ type AnyProviderCredentials = ProviderCredentials | ImapProviderCredentials;
 
 interface StartWatchInput {
   baseUrl: string;
+  applicationId?: string | undefined;
   watchedFolderIds?: string[] | undefined;
   gmailPubsubTopicName?: string | undefined;
   clientState?: string | undefined;
