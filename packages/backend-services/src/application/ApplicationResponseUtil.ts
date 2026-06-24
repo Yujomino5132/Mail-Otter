@@ -1,12 +1,14 @@
-import { ApplicationContextDAO, ProcessedMessageDAO, ProviderSubscriptionDAO } from '@mail-otter/backend-data/dao';
+import { ApplicationContextDAO, ConnectedApplicationDAO, ProcessedMessageDAO, ProviderSubscriptionDAO } from '@mail-otter/backend-data/dao';
 import type { D1Queryable } from '@mail-otter/backend-data/utils';
 import type {
   ApplicationContextSummary,
   ConnectedApplicationMetadata,
+  DigestConfig,
   ProcessedMessage,
   ProviderSubscription,
 } from '@mail-otter/shared/model';
 import { BaseUrlUtil } from '@mail-otter/shared/utils';
+import { DigestConfigService } from '../digest/DigestConfigService';
 
 class ApplicationResponseUtil {
   public static async decorateApplication(
@@ -34,8 +36,20 @@ class ApplicationResponseUtil {
       contextSummary.lastErrorAt != null &&
       contextSummary.lastErrorAt <= application.contextLastErrorAcknowledgedAt;
 
+    let digestConfig: DigestConfig | null = null;
+    if (env.AES_ENCRYPTION_KEY_SECRET) {
+      try {
+        const masterKey: string = await env.AES_ENCRYPTION_KEY_SECRET.get();
+        const digestService = new DigestConfigService(new ConnectedApplicationDAO(env.DB, masterKey));
+        digestConfig = await digestService.getConfig(application.applicationId);
+      } catch {
+        console.warn(`[ApplicationResponseUtil] Failed to fetch digest config for ${application.applicationId}`);
+      }
+    }
+
     return {
       ...application,
+      digestConfig,
       oauth2RedirectUri: `${baseUrl}/api/oauth2/callback/${application.applicationId}`,
       webhookUrl: `${baseUrl}/api/webhooks/${application.providerId === 'google-gmail' ? 'gmail' : 'outlook'}/${application.applicationId}${
         subscription?.webhookSecretHash ? '?token=shown-on-watch-start' : ''
@@ -56,9 +70,11 @@ class ApplicationResponseUtil {
 
 interface ApplicationDecorationEnv {
   DB: D1Queryable;
+  AES_ENCRYPTION_KEY_SECRET?: SecretsStoreSecret | undefined;
 }
 
 interface ApplicationResponse extends ConnectedApplicationMetadata {
+  digestConfig?: DigestConfig | null;
   oauth2RedirectUri: string;
   webhookUrl: string;
   watchStatus?: string | undefined;
