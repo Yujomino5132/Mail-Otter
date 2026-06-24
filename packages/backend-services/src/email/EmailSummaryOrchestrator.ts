@@ -92,7 +92,7 @@ class EmailSummaryOrchestrator {
       env: this.env, application, enabledApplicationIds: this.enabledApplicationIds, subject, from, body,
       sourceDocumentId: resolvedMessageId, sourceThreadId: threadId,
     });
-    const summary: EmailProcessingSummary = await this.summarize(application, subject, from, body, ragContext, customInstruction);
+    const summary: EmailProcessingSummary = await this.summarize(application, resolvedMessageId, subject, from, body, ragContext, customInstruction);
     await this.auditLogger.logSummaryGenerated(application, resolvedMessageId, summary.summaryModel, options.retryAttempt);
     const processedMessage = await this.processedDAO.getByMessageId(application.applicationId, resolvedMessageId);
     const actions: CreatedEmailAction[] = !suppressActions && processedMessage
@@ -112,6 +112,7 @@ class EmailSummaryOrchestrator {
 
   private async summarize(
     application: ConnectedApplication,
+    sourceDocumentId: string,
     subject: string,
     from: string,
     body: string,
@@ -133,6 +134,7 @@ class EmailSummaryOrchestrator {
       const fallbackModel: string = ConfigurationManager.getEmailSummaryFallbackModel(this.env);
       if (model === fallbackModel) throw error;
       console.warn(`AI summary failed with primary model ${model}, retrying with fallback ${fallbackModel}:`, error);
+      await this.auditLogger.logModelFallback(application, sourceDocumentId, model, error);
       model = fallbackModel;
       try {
         result = await EmailSummaryUtil.summarizeEmailWithUsage(this.env.AI, model, subject, from, input, ragContext, timeZone, customInstruction);
