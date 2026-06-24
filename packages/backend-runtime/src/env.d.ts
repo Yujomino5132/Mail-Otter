@@ -38,6 +38,8 @@ declare global {
     ACTION_CALLBACK_BASE_URL?: string | undefined;
     ACTION_DEFAULT_EXPIRY_HOURS?: string | undefined;
     ACTION_RETENTION_DAYS?: string | undefined;
+    PACKAGE_TRACKING_API_KEY?: string | undefined;
+    FLIGHT_TRACKING_API_KEY?: string | undefined;
   }
 }
 

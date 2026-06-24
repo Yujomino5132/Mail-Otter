@@ -60,6 +60,10 @@ vi.mock('@mail-otter/backend-runtime/config', () => ({
     getActionCallbackBaseUrl: vi.fn(() => ''),
     getActionDefaultExpiryHours: vi.fn(() => 24),
     getActionRetentionDays: vi.fn(() => 30),
+    digest: {
+      getPackageTrackingApiKey: vi.fn(() => ''),
+      getFlightTrackingApiKey: vi.fn(() => ''),
+    },
   },
 }));
 
@@ -82,6 +86,11 @@ vi.mock('../../packages/backend-services/src/oauth2/OAuth2AccessTokenService', (
   OAuth2AccessTokenService: vi.fn(function () {
     return { getAccessToken: vi.fn(async () => 'access-token') };
   }),
+}));
+
+const { mockFetchStatus } = vi.hoisted(() => ({ mockFetchStatus: vi.fn() }));
+vi.mock('../../packages/backend-services/src/action/PackageTrackingService', () => ({
+  fetchStatus: mockFetchStatus,
 }));
 
 vi.mock('@mail-otter/provider-clients/gmail', () => ({
@@ -1012,6 +1021,51 @@ describe('ActionService', () => {
 
       expect(mockMarkSucceeded).toHaveBeenCalledWith('action-1', expect.objectContaining({
         summary: 'Package tracking noted: 1Z999 via UPS.',
+      }));
+    });
+
+    it('executes delivery.track_package with Aftership API key and returns live status', async () => {
+      const { ConfigurationManager } = await import('@mail-otter/backend-runtime/config');
+      (ConfigurationManager.digest.getPackageTrackingApiKey as ReturnType<typeof vi.fn>).mockReturnValue('aftership-key');
+      mockFetchStatus.mockResolvedValue({ summary: 'In Transit — In transit, Louisville, KY' });
+
+      const payload = { type: 'delivery.track_package', trackingNumber: '1Z999', carrier: 'UPS', trackingUrl: 'https://track.example.com/1Z999' };
+      const action = makeAction({ actionType: 'delivery.track_package', payload });
+      const doneAction = makeAction({ status: 'succeeded' });
+      mockGetByTokenHash.mockResolvedValue(action);
+      mockClaimForExecution.mockResolvedValue(true);
+      mockMarkSucceeded.mockResolvedValue(undefined);
+      mockRecordExecution.mockResolvedValue(undefined);
+      mockGetForUser.mockResolvedValue(doneAction);
+
+      await ActionService.executeActionWithToken('action-1', 'token', new Request('https://example.com'), makeEnv() as never);
+
+      expect(mockFetchStatus).toHaveBeenCalledWith('1Z999', 'UPS', 'aftership-key');
+      expect(mockMarkSucceeded).toHaveBeenCalledWith('action-1', expect.objectContaining({
+        summary: 'In Transit — In transit, Louisville, KY',
+        externalUrl: 'https://track.example.com/1Z999',
+      }));
+    });
+
+    it('falls back to static behavior when Aftership API returns null', async () => {
+      const { ConfigurationManager } = await import('@mail-otter/backend-runtime/config');
+      (ConfigurationManager.digest.getPackageTrackingApiKey as ReturnType<typeof vi.fn>).mockReturnValue('aftership-key');
+      mockFetchStatus.mockResolvedValue(null);
+
+      const payload = { type: 'delivery.track_package', trackingNumber: '1Z999', carrier: 'UPS', trackingUrl: 'https://track.example.com/1Z999' };
+      const action = makeAction({ actionType: 'delivery.track_package', payload });
+      const doneAction = makeAction({ status: 'succeeded' });
+      mockGetByTokenHash.mockResolvedValue(action);
+      mockClaimForExecution.mockResolvedValue(true);
+      mockMarkSucceeded.mockResolvedValue(undefined);
+      mockRecordExecution.mockResolvedValue(undefined);
+      mockGetForUser.mockResolvedValue(doneAction);
+
+      await ActionService.executeActionWithToken('action-1', 'token', new Request('https://example.com'), makeEnv() as never);
+
+      expect(mockMarkSucceeded).toHaveBeenCalledWith('action-1', expect.objectContaining({
+        summary: 'Package tracking link opened.',
+        externalUrl: 'https://track.example.com/1Z999',
       }));
     });
 
