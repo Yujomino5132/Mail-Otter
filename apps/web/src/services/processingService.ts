@@ -1,5 +1,7 @@
 import { apiFetch, readJson } from '../../components/utils';
 
+export const TRIGGERABLE_TASK_TYPES = ['calendar_sync', 'action_status_sync'] as const;
+
 export type BackgroundTaskRunStatus = 'running' | 'success' | 'partial_success' | 'error' | 'skipped';
 export type ProcessedMessageStatus = 'processing' | 'summarized' | 'skipped' | 'error';
 
@@ -84,6 +86,15 @@ export async function loadCalendarEvents(options: {
   return readJson<{ events: SyncedCalendarEvent[]; nextCursor?: string }>(
     await apiFetch(`/user/processing/calendar-events${qs ? `?${qs}` : ''}`),
   );
+}
+
+export async function triggerTaskRun(taskType: string, applicationId: string): Promise<void> {
+  const response = await apiFetch('/user/processing/run-task', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ taskType, applicationId }),
+  });
+  await readJson(response);
 }
 
 export async function loadProcessedMessages(options: {

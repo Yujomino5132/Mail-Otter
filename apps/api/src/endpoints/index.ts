@@ -44,6 +44,7 @@ import { OutlookLifecycleWebhookRoute as OriginalOutlookLifecycleWebhookRoute } 
 import { ListBackgroundTaskRunsRoute as OriginalListBackgroundTaskRunsRoute } from './user/processing/task-runs/GET';
 import { ListProcessingCalendarEventsRoute as OriginalListProcessingCalendarEventsRoute } from './user/processing/calendar-events/GET';
 import { ListProcessedMessagesRoute as OriginalListProcessedMessagesRoute } from './user/processing/messages/GET';
+import { RunTaskNowRoute as OriginalRunTaskNowRoute } from './user/processing/run-task/POST';
 
 export const GetAnalyticsRoute: any = OriginalGetAnalyticsRoute;
 export const GetCurrentUserRoute: any = OriginalGetCurrentUserRoute;
@@ -88,3 +89,4 @@ export const SendDigestNowRoute: any = OriginalSendDigestNowRoute;
 export const ListBackgroundTaskRunsRoute: any = OriginalListBackgroundTaskRunsRoute;
 export const ListProcessingCalendarEventsRoute: any = OriginalListProcessingCalendarEventsRoute;
 export const ListProcessedMessagesRoute: any = OriginalListProcessedMessagesRoute;
+export const RunTaskNowRoute: any = OriginalRunTaskNowRoute;

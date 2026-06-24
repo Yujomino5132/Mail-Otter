@@ -1,4 +1,4 @@
-import { RefreshCw, ChevronDown } from 'lucide-react';
+import { RefreshCw, ChevronDown, Play } from 'lucide-react';
 import type { ConnectedApplication } from '../../../components/types';
 import type {
   BackgroundTaskRun,
@@ -7,7 +7,7 @@ import type {
   ProcessedMessageStatus,
   SyncedCalendarEvent,
 } from '../../services/processingService';
-import { getTaskTypeLabel } from '../../services/processingService';
+import { getTaskTypeLabel, TRIGGERABLE_TASK_TYPES } from '../../services/processingService';
 import { TaskRunStatusBadge, ProcessedMessageStatusBadge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Card, CardHeader, CardTitle } from '../ui/Card';
@@ -132,6 +132,8 @@ export function ProcessingView({
   processedMessagesCursor,
   processedMessagesLoading,
   onRefresh,
+  onTriggerTaskRun,
+  triggeringTask,
   onLoadMoreTaskRuns,
   onLoadMoreCalendarEvents,
   onLoadMoreProcessedMessages,
@@ -155,6 +157,8 @@ export function ProcessingView({
   processedMessagesCursor?: string;
   processedMessagesLoading: boolean;
   onRefresh: () => void;
+  onTriggerTaskRun: () => void;
+  triggeringTask: boolean;
   onLoadMoreTaskRuns: () => void;
   onLoadMoreCalendarEvents: () => void;
   onLoadMoreProcessedMessages: () => void;
@@ -190,6 +194,15 @@ export function ProcessingView({
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </Select>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onTriggerTaskRun}
+          disabled={triggeringTask || !(TRIGGERABLE_TASK_TYPES as readonly string[]).includes(taskType) || !applicationId}
+        >
+          <Play className="h-3.5 w-3.5" />
+          Run Now
+        </Button>
         <Button variant="secondary" size="sm" onClick={onRefresh} className="ml-auto">
           <RefreshCw className="h-3.5 w-3.5" />
           Refresh

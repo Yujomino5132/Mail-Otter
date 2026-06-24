@@ -24,6 +24,8 @@ export function useProcessing({ showNotice }: UseProcessingOptions) {
   const [processedMessagesCursor, setProcessedMessagesCursor] = useState<string | undefined>(undefined);
   const [processedMessagesLoading, setProcessedMessagesLoading] = useState(false);
 
+  const [triggeringTask, setTriggeringTask] = useState(false);
+
   const loadTaskRuns = async (append = false, cursor?: string) => {
     setTaskRunsLoading(true);
     try {
@@ -79,6 +81,19 @@ export function useProcessing({ showNotice }: UseProcessingOptions) {
     await Promise.all([loadTaskRuns(), loadCalendarEvents(), loadProcessedMessages()]);
   };
 
+  const triggerTaskRun = async () => {
+    setTriggeringTask(true);
+    try {
+      await processingService.triggerTaskRun(processingTaskType, processingApplicationId);
+      showNotice('success', 'Task Triggered Successfully.');
+      await loadTaskRuns();
+    } catch (e) {
+      showNotice('error', e instanceof Error ? e.message : 'Unable To Trigger Task.');
+    } finally {
+      setTriggeringTask(false);
+    }
+  };
+
   return {
     processingApplicationId,
     setProcessingApplicationId,
@@ -105,5 +120,7 @@ export function useProcessing({ showNotice }: UseProcessingOptions) {
     loadProcessedMessages,
 
     loadProcessing,
+    triggerTaskRun,
+    triggeringTask,
   };
 }

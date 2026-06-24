@@ -230,6 +230,8 @@ export default function SpaApp() {
               processedMessagesCursor={processing.processedMessagesCursor}
               processedMessagesLoading={processing.processedMessagesLoading}
               onRefresh={() => processing.loadProcessing()}
+              onTriggerTaskRun={() => processing.triggerTaskRun()}
+              triggeringTask={processing.triggeringTask}
               onLoadMoreTaskRuns={() => processing.loadTaskRuns(true, processing.taskRunsCursor)}
               onLoadMoreCalendarEvents={() => processing.loadCalendarEvents(true, processing.calendarEventsCursor)}
               onLoadMoreProcessedMessages={() => processing.loadProcessedMessages(true, processing.processedMessagesCursor)}
