@@ -8,6 +8,11 @@ const GPT_OSS_120B_RATES: ModelNeuronRates = {
   outputNeuronsPerMillionTokens: 68182,
 };
 
+const KIMI_K2_6_RATES: ModelNeuronRates = {
+  inputNeuronsPerMillionTokens: 86364,
+  outputNeuronsPerMillionTokens: 363636,
+};
+
 const BGE_M3_RATES: ModelNeuronRates = {
   inputNeuronsPerMillionTokens: 1075,
 };
@@ -18,6 +23,7 @@ const MODEL_NEURON_RATES: Readonly<Record<string, ModelNeuronRates>> = {
     inputNeuronsPerMillionTokens: 18182,
     outputNeuronsPerMillionTokens: 27273,
   },
+  '@cf/moonshotai/kimi-k2.6': KIMI_K2_6_RATES,
   '@cf/baai/bge-m3': BGE_M3_RATES,
 };
 

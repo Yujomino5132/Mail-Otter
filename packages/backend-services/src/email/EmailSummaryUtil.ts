@@ -50,8 +50,6 @@ const SUMMARY_JSON_SCHEMA = {
   },
 } as const;
 
-const GPT_OSS_MODELS: ReadonlySet<string> = new Set<string>(['@cf/openai/gpt-oss-120b', '@cf/openai/gpt-oss-20b']);
-
 class EmailSummaryUtil {
   public static async summarizeEmail(
     ai: Ai,
@@ -100,10 +98,7 @@ class EmailSummaryUtil {
       };
     }
 
-    if (EmailSummaryUtil.isGptOssModel(model)) {
-      request.reasoning_effort = 'low';
-      request.chat_template_kwargs = { enable_thinking: false };
-    }
+    request.reasoning_effort = 'low';
 
     const result = await (ai as unknown as { run: (...args: unknown[]) => Promise<unknown> }).run(model, request);
     const usage: AiTextGenerationUsage | undefined = WorkersAiResponseUtil.extractUsage(result);
@@ -162,10 +157,6 @@ class EmailSummaryUtil {
       body,
       ...(ragContext ? ['', '--- PRIOR CONTEXT (for background only, do not summarize) ---', ragContext] : []),
     ].join('\n');
-  }
-
-  private static isGptOssModel(model: string): boolean {
-    return GPT_OSS_MODELS.has(model);
   }
 
   static parseAiSummaryResult(result: string): EmailSummary | undefined {
@@ -316,7 +307,6 @@ interface AiTextGenerationRequest {
       }
     | undefined;
   reasoning_effort?: 'low' | 'medium' | 'high' | undefined;
-  chat_template_kwargs?: { enable_thinking?: boolean | undefined } | undefined;
 }
 
 export { EmailSummaryUtil };

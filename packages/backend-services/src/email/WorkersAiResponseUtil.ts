@@ -10,6 +10,7 @@ const JSON_MODE_SUPPORTED_MODELS: ReadonlySet<string> = new Set<string>([
   '@hf/nousresearch/hermes-2-pro-mistral-7b',
   '@hf/thebloke/deepseek-coder-6.7b-instruct-awq',
   '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b',
+  '@cf/moonshotai/kimi-k2.6',
 ]);
 
 class WorkersAiResponseUtil {

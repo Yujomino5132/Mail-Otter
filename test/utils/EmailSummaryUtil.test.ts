@@ -72,7 +72,7 @@ describe('EmailSummaryUtil', () => {
     } satisfies Partial<AiSummaryRetryableError>);
   });
 
-  it('requests JSON mode and low reasoning from gpt-oss-120b', async () => {
+  it('requests JSON mode and low reasoning from kimi-k2.6', async () => {
     const ai = {
       run: vi.fn().mockResolvedValue({
         response: `Here is the summary:
@@ -86,7 +86,7 @@ describe('EmailSummaryUtil', () => {
       }),
     } as unknown as Ai;
 
-    await expect(EmailSummaryUtil.summarizeEmail(ai, '@cf/openai/gpt-oss-120b', 'Campaign budget', 'sam@example.com', 'body')).resolves
+    await expect(EmailSummaryUtil.summarizeEmail(ai, '@cf/moonshotai/kimi-k2.6', 'Campaign budget', 'sam@example.com', 'body')).resolves
       .toBe(`<p>The sender needs approval for the budget.</p>
 
 <p><strong>Details:</strong></p>
@@ -94,7 +94,7 @@ describe('EmailSummaryUtil', () => {
 <li>Budget is $12,000.</li>
 </ul>`);
     expect(ai.run).toHaveBeenCalledWith(
-      '@cf/openai/gpt-oss-120b',
+      '@cf/moonshotai/kimi-k2.6',
       expect.objectContaining({
         response_format: {
           type: 'json_schema',
@@ -104,9 +104,9 @@ describe('EmailSummaryUtil', () => {
           }),
         },
         reasoning_effort: 'low',
-        chat_template_kwargs: { enable_thinking: false },
       }),
     );
+    expect((ai.run as ReturnType<typeof vi.fn>).mock.calls[0][1]).not.toHaveProperty('chat_template_kwargs');
   });
 
   it('extracts summary text from Responses API output', async () => {
