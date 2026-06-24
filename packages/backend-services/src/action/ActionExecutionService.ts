@@ -35,6 +35,8 @@ import { OAuth2AccessTokenService } from '../oauth2/OAuth2AccessTokenService';
 import { createActionDAO, hashToken } from './ActionServiceUtils';
 import type { ActionCreationEnv } from './ActionCreationService';
 import { renderConfirmationPage, renderMessagePage, renderResultPage } from './ActionRenderService';
+import * as PackageTrackingService from './PackageTrackingService';
+import { ConfigurationManager } from '@mail-otter/backend-runtime/config';
 
 interface ActionHtmlResponse {
   statusCode: number;
@@ -88,6 +90,11 @@ async function executeProviderOperation(action: EmailAction, env: ActionExecutio
   }
   if (action.actionType === EMAIL_ACTION_TYPE_DELIVERY_TRACK_PACKAGE) {
     const payload = action.payload as DeliveryTrackPackageActionPayload;
+    const trackingApiKey = ConfigurationManager.digest.getPackageTrackingApiKey(env);
+    if (trackingApiKey) {
+      const status = await PackageTrackingService.fetchStatus(payload.trackingNumber, payload.carrier, trackingApiKey);
+      if (status) return { summary: status.summary, externalUrl: payload.trackingUrl ?? undefined };
+    }
     if (payload.trackingUrl) return { summary: 'Package tracking link opened.', externalUrl: payload.trackingUrl };
     const via = payload.carrier ? ` via ${payload.carrier}` : '';
     return { summary: `Package tracking noted: ${payload.trackingNumber}${via}.` };
