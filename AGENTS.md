@@ -292,6 +292,10 @@ All user-visible text in `apps/web/` must use **Title Case** (capitalize the fir
 - Use `vi.hoisted()` for mock variables referenced across vi.mock factories
 - `beforeEach` with `vi.clearAllMocks()` resets call counts
 
+## Commit Policy
+
+Always commit changes after completing work unless the user explicitly says not to. Do not wait to be asked.
+
 ## Git Commit Messages
 
 - Use Conventional Commits with this subject format: `<TYPE>[optional scope]: <description>`.
