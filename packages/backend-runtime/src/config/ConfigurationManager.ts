@@ -40,6 +40,7 @@ import {
   DEFAULT_ATTACHMENT_VISION_MODEL,
   DEFAULT_MAX_ATTACHMENT_SIZE_BYTES,
   DEFAULT_MAX_ATTACHMENTS_PER_EMAIL,
+  DEFAULT_MAX_DRIVE_FILES_PER_SYNC,
 } from './ConfigurationDefaults';
 import { EnvParser } from './EnvParser';
 
@@ -117,6 +118,10 @@ class ConfigurationManager {
 
   public static readonly processing = {
     getTaskRunRetentionDays: (env: unknown): number => EnvParser.positiveInt(env, 'BACKGROUND_TASK_RUN_RETENTION_DAYS', DEFAULT_BACKGROUND_TASK_RUN_RETENTION_DAYS),
+  };
+
+  public static readonly drive = {
+    getMaxFilesPerSync: (env: unknown): number => EnvParser.positiveInt(env, 'MAX_DRIVE_FILES_PER_SYNC', DEFAULT_MAX_DRIVE_FILES_PER_SYNC),
   };
 
   // ─── Flat API (backward-compatible, delegates to namespace groups) ────────────

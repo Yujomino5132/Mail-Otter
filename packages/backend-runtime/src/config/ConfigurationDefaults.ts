@@ -39,4 +39,5 @@ export const DEFAULT_ATTACHMENT_VISION_ENABLED = 'true';
 export const DEFAULT_ATTACHMENT_VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
 export const DEFAULT_MAX_ATTACHMENT_SIZE_BYTES = '2097152';
 export const DEFAULT_MAX_ATTACHMENTS_PER_EMAIL = '3';
+export const DEFAULT_MAX_DRIVE_FILES_PER_SYNC = '20';
 

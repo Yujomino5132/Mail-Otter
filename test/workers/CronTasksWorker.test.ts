@@ -19,6 +19,8 @@ const { taskSpies } = vi.hoisted(() => ({
     syncedCalendarEventPruning: vi.fn(),
     backgroundTaskRunPruning: vi.fn(),
     scheduledActionExecution: vi.fn(),
+    googleDriveSync: vi.fn(),
+    oneDriveSync: vi.fn(),
     subscriptionRenewal: vi.fn(),
   },
 }));
@@ -75,6 +77,12 @@ vi.mock('@mail-otter/background/scheduled', () => ({
   ScheduledActionExecutionTask: class {
     handle = taskSpies.scheduledActionExecution;
   },
+  GoogleDriveSyncTask: class {
+    handle = taskSpies.googleDriveSync;
+  },
+  OneDriveSyncTask: class {
+    handle = taskSpies.oneDriveSync;
+  },
 }));
 
 vi.mock('@mail-otter/backend-services/subscription', () => ({
@@ -130,6 +138,8 @@ describe('CronTasksWorker', () => {
     taskSpies.syncedCalendarEventPruning.mockReset().mockResolvedValue(undefined);
     taskSpies.backgroundTaskRunPruning.mockReset().mockResolvedValue(undefined);
     taskSpies.scheduledActionExecution.mockReset().mockResolvedValue(undefined);
+    taskSpies.googleDriveSync.mockReset().mockResolvedValue(undefined);
+    taskSpies.oneDriveSync.mockReset().mockResolvedValue(undefined);
     taskSpies.subscriptionRenewal.mockReset().mockResolvedValue(undefined);
   });
 
@@ -149,6 +159,8 @@ describe('CronTasksWorker', () => {
     expect(taskSpies.aiDailyUsagePruning).toHaveBeenCalledOnce();
     expect(taskSpies.emailActionPruning).toHaveBeenCalledOnce();
     expect(taskSpies.auditLogPruning).toHaveBeenCalledOnce();
+    expect(taskSpies.googleDriveSync).toHaveBeenCalledOnce();
+    expect(taskSpies.oneDriveSync).toHaveBeenCalledOnce();
     expect(taskSpies.subscriptionRenewal).toHaveBeenCalledWith();
     expect(taskSpies.oauth2Refresh.mock.invocationCallOrder[0]).toBeLessThan(taskSpies.contextPruning.mock.invocationCallOrder[0]);
     expect(taskSpies.contextPruning.mock.invocationCallOrder[0]).toBeLessThan(taskSpies.processedMessagePruning.mock.invocationCallOrder[0]);

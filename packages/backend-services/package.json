@@ -31,7 +31,9 @@
     "./digest": "./src/digest/index.ts",
     "./digest/*": "./src/digest/*.ts",
     "./processing": "./src/processing/index.ts",
-    "./processing/*": "./src/processing/*.ts"
+    "./processing/*": "./src/processing/*.ts",
+    "./drive": "./src/drive/index.ts",
+    "./drive/*": "./src/drive/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

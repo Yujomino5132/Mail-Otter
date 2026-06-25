@@ -13,7 +13,9 @@
     "./oauth2": "./src/oauth2/index.ts",
     "./outlook": "./src/outlook/index.ts",
     "./webhook": "./src/webhook/index.ts",
-    "./yahoo": "./src/yahoo/index.ts"
+    "./yahoo": "./src/yahoo/index.ts",
+    "./google-drive": "./src/google-drive/index.ts",
+    "./onedrive": "./src/onedrive/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

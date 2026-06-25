@@ -119,6 +119,119 @@ class ApplicationContextDAO extends BaseDAO {
     return document;
   }
 
+  public async upsertDriveDocument(input: UpsertDriveDocumentInput): Promise<ApplicationContextDocument> {
+    const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    const existing: ApplicationContextDocumentInternal | null = await this.database
+      .prepare(
+        `
+          SELECT ${ApplicationContextDAO.documentColumns}
+          FROM application_context_documents
+          WHERE application_id = ? AND source_type = ? AND source_document_id = ?
+          LIMIT 1
+        `,
+      )
+      .bind(input.applicationId, input.sourceType, input.sourceDocumentId)
+      .first<ApplicationContextDocumentInternal>();
+
+    if (existing) {
+      await executeD1WithRetry(
+        (): Promise<D1Result> =>
+          this.database
+            .prepare(
+              `
+                UPDATE application_context_documents
+                SET user_email = ?, source_provider_id = ?, vector_namespace = ?,
+                    source_document_fingerprint = ?, title_fingerprint = ?,
+                    content_fingerprint = ?, indexed_text_chars = ?, status = ?,
+                    source_thread_id = NULL, source_thread_fingerprint = NULL, sender_fingerprint = NULL,
+                    deleted_at = NULL, last_error = NULL, updated_at = ?
+                WHERE context_document_id = ?
+              `,
+            )
+            .bind(
+              input.userEmail,
+              input.sourceProviderId,
+              input.vectorNamespace,
+              input.sourceDocumentFingerprint,
+              input.titleFingerprint,
+              input.contentFingerprint,
+              input.indexedTextChars,
+              APPLICATION_CONTEXT_DOCUMENT_STATUS_ACTIVE,
+              now,
+              existing.context_document_id,
+            )
+            .run(),
+        'update drive context document',
+      );
+      const updated: ApplicationContextDocument | undefined = await this.getDocumentById(existing.context_document_id);
+      if (!updated) throw new DatabaseError('Failed to load application context document after update.');
+      return updated;
+    }
+
+    const contextDocumentId: string = UUIDUtil.getRandomUUID();
+    const vectorId: string = `cd_${contextDocumentId}`;
+    await executeD1WithRetry(
+      (): Promise<D1Result> =>
+        this.database
+          .prepare(
+            `
+              INSERT INTO application_context_documents
+                (context_document_id, application_id, user_email, source_type, source_provider_id, source_document_id, source_thread_id,
+                 vector_namespace, vector_id, source_document_fingerprint, source_thread_fingerprint, title_fingerprint, sender_fingerprint,
+                 content_fingerprint, indexed_text_chars, status, indexed_at, deleted_at, last_error, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, ?, NULL, ?, ?, ?, NULL, NULL, NULL, ?, ?)
+            `,
+          )
+          .bind(
+            contextDocumentId,
+            input.applicationId,
+            input.userEmail,
+            input.sourceType,
+            input.sourceProviderId,
+            input.sourceDocumentId,
+            input.vectorNamespace,
+            vectorId,
+            input.sourceDocumentFingerprint,
+            input.titleFingerprint,
+            input.contentFingerprint,
+            input.indexedTextChars,
+            APPLICATION_CONTEXT_DOCUMENT_STATUS_ACTIVE,
+            now,
+            now,
+          )
+          .run(),
+      'create drive context document',
+    );
+    const document: ApplicationContextDocument | undefined = await this.getDocumentById(contextDocumentId);
+    if (!document) throw new DatabaseError('Failed to load application context document after create.');
+    return document;
+  }
+
+  public async getDocumentSourceInfo(
+    applicationId: string,
+    sourceDocumentId: string,
+    sourceType: string,
+  ): Promise<{ contextDocumentId: string; vectorId: string; userEmail: string } | undefined> {
+    const row: { context_document_id: string; vector_id: string; user_email: string } | null =
+      await this.database
+        .prepare(
+          `
+            SELECT context_document_id, vector_id, user_email
+            FROM application_context_documents
+            WHERE application_id = ? AND source_type = ? AND source_document_id = ?
+            LIMIT 1
+          `,
+        )
+        .bind(applicationId, sourceType, sourceDocumentId)
+        .first<{ context_document_id: string; vector_id: string; user_email: string }>();
+    if (!row) return undefined;
+    return {
+      contextDocumentId: row.context_document_id,
+      vectorId: row.vector_id,
+      userEmail: row.user_email,
+    };
+  }
+
   public async getContextDocumentIdBySource(applicationId: string, sourceDocumentId: string, sourceType: string): Promise<string | undefined> {
     const row: { context_document_id: string } | null = await this.database
       .prepare(
@@ -867,6 +980,19 @@ interface UpsertEmailDocumentInput {
   indexedTextChars: number;
 }
 
+interface UpsertDriveDocumentInput {
+  applicationId: string;
+  userEmail: string;
+  sourceProviderId: ProviderId;
+  sourceType: string;
+  sourceDocumentId: string;
+  vectorNamespace: string;
+  sourceDocumentFingerprint: string;
+  titleFingerprint: string;
+  contentFingerprint: string;
+  indexedTextChars: number;
+}
+
 interface ListContextDocumentsInput {
   applicationId?: string;
   status?: ApplicationContextDocumentStatus;
@@ -922,4 +1048,4 @@ interface ApplicationContextUserCounts {
 }
 
 export { ApplicationContextDAO };
-export type { ApplicationContextUserCounts, InsertAuditLogInput, ListAuditLogsOptions, ListContextDocumentsInput, ListDeletionRunsInput, OverLimitApplication, RecordDeletionRunInput, UpsertEmailDocumentInput };
+export type { ApplicationContextUserCounts, InsertAuditLogInput, ListAuditLogsOptions, ListContextDocumentsInput, ListDeletionRunsInput, OverLimitApplication, RecordDeletionRunInput, UpsertDriveDocumentInput, UpsertEmailDocumentInput };

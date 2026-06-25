@@ -12,7 +12,7 @@ export { UserDAO } from './UserDAO';
 export { AiDailyUsageDAO } from './AiDailyUsageDAO';
 export type { AiDailyUsage, IncrementAiDailyUsageInput } from './AiDailyUsageDAO';
 export { ApplicationContextDAO } from './ApplicationContextDAO';
-export type { ApplicationContextUserCounts, OverLimitApplication } from './ApplicationContextDAO';
+export type { ApplicationContextUserCounts, OverLimitApplication, UpsertDriveDocumentInput } from './ApplicationContextDAO';
 export { ConnectedApplicationDAO } from './ConnectedApplicationDAO';
 export { EmailActionDAO } from './EmailActionDAO';
 export type { CreateEmailActionInput, EmailActionCounts, ListEmailActionsInput, RecordEmailActionExecutionInput } from './EmailActionDAO';

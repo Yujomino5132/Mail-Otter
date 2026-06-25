@@ -94,5 +94,7 @@ async function executeScheduledActions(env: ActionExecutionEnv): Promise<Schedul
   return { attempted: actions.length, succeeded, failed };
 }
 
-export type { ActionExecutionEnv as ActionSchedulingEnv, ScheduledExecutionResult };
+export type {  ScheduledExecutionResult };
 export { snoozeAction, scheduleAction, executeScheduledActions };
+
+export {type ActionExecutionEnv as ActionSchedulingEnv} from './ActionExecutionService';

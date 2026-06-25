@@ -123,10 +123,12 @@ function SnoozeDropdown({
               className="w-full text-xs"
               disabled={!customValue}
               onClick={() => {
-                if (customValue) {
-                  onSnooze(localDatetimeToISO(customValue));
-                  setOpen(false);
+                if (!customValue) {
+                	return;
                 }
+
+                onSnooze(localDatetimeToISO(customValue));
+                setOpen(false);
               }}
             >
               Set Custom

@@ -16,3 +16,5 @@ export { ScheduledDigestTask } from './ScheduledDigestTask';
 export { SyncedCalendarEventPruningTask } from './SyncedCalendarEventPruningTask';
 export { BackgroundTaskRunPruningTask } from './BackgroundTaskRunPruningTask';
 export { ScheduledActionExecutionTask } from './ScheduledActionExecutionTask';
+export { GoogleDriveSyncTask } from './GoogleDriveSyncTask';
+export { OneDriveSyncTask } from './OneDriveSyncTask';
