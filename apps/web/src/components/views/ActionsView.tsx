@@ -50,9 +50,10 @@ function formatSnoozedUntil(ts: number): string {
   return date.toLocaleDateString();
 }
 
+const pad = (n: number) => String(n).padStart(2, '0');
+
 function toLocalDatetimeValue(isoString: string): string {
   const d = new Date(isoString);
-  const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
@@ -70,6 +71,7 @@ function SnoozeDropdown({
   const [open, setOpen] = useState(false);
   const [customValue, setCustomValue] = useState('');
   const ref = useRef<HTMLDivElement>(null);
+  const [minDatetime] = useState(() => toLocalDatetimeValue(new Date(Date.now() + 60_000).toISOString()));
 
   useEffect(() => {
     if (!open) return;
@@ -112,7 +114,7 @@ function SnoozeDropdown({
               type="datetime-local"
               className="w-full rounded-lg bg-[var(--color-surface-3)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-xs px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
               value={customValue}
-              min={toLocalDatetimeValue(new Date(Date.now() + 60_000).toISOString())}
+              min={minDatetime}
               onChange={(e) => setCustomValue(e.target.value)}
             />
             <Button
@@ -176,7 +178,8 @@ export function ActionsView({
   busy: boolean;
 }) {
   const selectedAction = actions.find((a) => a.actionId === selectedActionId);
-  const now = Date.now() / 1000;
+  const [now] = useState(() => Date.now() / 1000);
+  const [minScheduleDatetime] = useState(() => toLocalDatetimeValue(new Date(Date.now() + 60_000).toISOString()));
 
   const [scheduleCustomValue, setScheduleCustomValue] = useState('');
 
@@ -392,7 +395,7 @@ export function ActionsView({
                         type="datetime-local"
                         className="rounded-lg bg-[var(--color-surface-3)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-xs px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)]"
                         value={scheduleCustomValue}
-                        min={toLocalDatetimeValue(new Date(Date.now() + 60_000).toISOString())}
+                        min={minScheduleDatetime}
                         onChange={(e) => setScheduleCustomValue(e.target.value)}
                       />
                       <Button
@@ -400,10 +403,12 @@ export function ActionsView({
                         size="sm"
                         disabled={busy || !scheduleCustomValue}
                         onClick={() => {
-                          if (scheduleCustomValue) {
-                            onScheduleAction(selectedAction.actionId, localDatetimeToISO(scheduleCustomValue));
-                            setScheduleCustomValue('');
+                          if (!scheduleCustomValue) {
+                          	return;
                           }
+
+                          onScheduleAction(selectedAction.actionId, localDatetimeToISO(scheduleCustomValue));
+                          setScheduleCustomValue('');
                         }}
                       >
                         Schedule
