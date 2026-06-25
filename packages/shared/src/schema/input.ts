@@ -67,7 +67,9 @@ const DeleteAppBodySchema = z.object({
 
 const UpdateAppContextBodySchema = z.object({
   applicationId: UuidSchema,
-  contextIndexingEnabled: z.boolean(),
+  contextIndexingEnabled: z.boolean().optional(),
+  ragRetrievalEnabled: z.boolean().optional(),
+  maxContextDocuments: z.number().int().positive().nullable().optional(),
 });
 
 const DeleteAppContextDocumentsBodySchema = z.object({

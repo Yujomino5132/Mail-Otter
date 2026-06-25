@@ -107,6 +107,25 @@ describe('Request input schemas', () => {
     ).resolves.toMatchObject({ success: false, scope: 'body' });
   });
 
+  describe('PUT /user/application/context', () => {
+    const applicationId = '11111111-1111-4111-8111-111111111111';
+
+    it('accepts body with only contextIndexingEnabled', async () => {
+      const request = new Request('https://mail.example.com/user/application/context', { method: 'PUT' });
+      await expect(validateRequestInput(request, { applicationId, contextIndexingEnabled: false })).resolves.toMatchObject({ success: true });
+    });
+
+    it('accepts body with only ragRetrievalEnabled', async () => {
+      const request = new Request('https://mail.example.com/user/application/context', { method: 'PUT' });
+      await expect(validateRequestInput(request, { applicationId, ragRetrievalEnabled: false })).resolves.toMatchObject({ success: true });
+    });
+
+    it('accepts body with only maxContextDocuments', async () => {
+      const request = new Request('https://mail.example.com/user/application/context', { method: 'PUT' });
+      await expect(validateRequestInput(request, { applicationId, maxContextDocuments: 10 })).resolves.toMatchObject({ success: true });
+    });
+  });
+
   describe('EmailProcessingRuleSchema', () => {
     const validRule = {
       ruleId: '11111111-1111-4111-8111-111111111111',
