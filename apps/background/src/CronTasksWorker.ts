@@ -14,6 +14,7 @@ import {
   OAuth2AccessTokenRefreshTask,
   OAuth2SessionPruningTask,
   ProcessedMessagePruningTask,
+  ScheduledActionExecutionTask,
   ScheduledDigestTask,
   StaleContextDocumentPruningTask,
   SyncedCalendarEventPruningTask,
@@ -102,6 +103,7 @@ class CronTasksWorker extends AbstractDurableObjectWorker {
       new ScheduledDigestTask().handle(event, this.env, ctx),
       new SyncedCalendarEventPruningTask().handle(event, this.env, ctx),
       new BackgroundTaskRunPruningTask().handle(event, this.env, ctx),
+      new ScheduledActionExecutionTask().handle(event, this.env, ctx),
     ]);
   }
 }

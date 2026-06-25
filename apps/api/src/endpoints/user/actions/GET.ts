@@ -18,12 +18,14 @@ class ListEmailActionsRoute extends IUserRoute<ListEmailActionsRequest, ListEmai
     env: ListEmailActionsEnv,
     cxt: RouteContext<ListEmailActionsEnv>,
   ): Promise<ListEmailActionsResponse> {
+    const showSnoozedRaw = this.getQueryParam(request, 'showSnoozed');
     return ActionService.listActionsForUser(
       this.getAuthenticatedUserEmailAddress(cxt),
       {
         applicationId: this.getQueryParam(request, 'applicationId'),
         status: this.getQueryParam(request, 'status') as EmailActionStatus | undefined,
         cursor: this.getQueryParam(request, 'cursor'),
+        showSnoozed: showSnoozedRaw === 'true',
       },
       env,
     );

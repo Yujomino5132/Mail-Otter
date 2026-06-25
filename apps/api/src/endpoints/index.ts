@@ -16,6 +16,8 @@ import { ListContextDocumentAuditLogsRoute as OriginalListContextDocumentAuditLo
 import { ListEmailActionsRoute as OriginalListEmailActionsRoute } from './user/actions/GET';
 import { ListEmailActionExecutionsRoute as OriginalListEmailActionExecutionsRoute } from './user/actions/executions/GET';
 import { ExecuteUserEmailActionRoute as OriginalExecuteUserEmailActionRoute } from './user/actions/execute/POST';
+import { SnoozeEmailActionRoute as OriginalSnoozeEmailActionRoute } from './user/actions/snooze/POST';
+import { ScheduleEmailActionRoute as OriginalScheduleEmailActionRoute } from './user/actions/schedule/POST';
 import { GetApplicationFoldersRoute as OriginalGetApplicationFoldersRoute } from './user/application/folders/GET';
 import { UpdateApplicationWatchSettingsRoute as OriginalUpdateApplicationWatchSettingsRoute } from './user/application/watch-settings/PUT';
 import { CreateOAuth2AuthorizationRoute as OriginalCreateOAuth2AuthorizationRoute } from './user/application/oauth2/authorize/POST';
@@ -63,6 +65,8 @@ export const ListContextDocumentAuditLogsRoute: any = OriginalListContextDocumen
 export const ListEmailActionsRoute: any = OriginalListEmailActionsRoute;
 export const ListEmailActionExecutionsRoute: any = OriginalListEmailActionExecutionsRoute;
 export const ExecuteUserEmailActionRoute: any = OriginalExecuteUserEmailActionRoute;
+export const SnoozeEmailActionRoute: any = OriginalSnoozeEmailActionRoute;
+export const ScheduleEmailActionRoute: any = OriginalScheduleEmailActionRoute;
 export const GetApplicationFoldersRoute: any = OriginalGetApplicationFoldersRoute;
 export const UpdateApplicationWatchSettingsRoute: any = OriginalUpdateApplicationWatchSettingsRoute;
 export const CreateOAuth2AuthorizationRoute: any = OriginalCreateOAuth2AuthorizationRoute;

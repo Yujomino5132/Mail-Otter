@@ -38,6 +38,8 @@ import {
   ListContextDocumentAuditLogsRoute,
   ListEmailActionExecutionsRoute,
   ListEmailActionsRoute,
+  ScheduleEmailActionRoute,
+  SnoozeEmailActionRoute,
   ListApplicationsRoute,
   OAuth2CallbackRoute,
   OutlookLifecycleWebhookRoute,
@@ -156,6 +158,8 @@ class MailOtterWorker extends AbstractEntrypointWorker {
     openapi.get('/user/actions', ListEmailActionsRoute);
     openapi.get('/user/actions/:actionId/executions', ListEmailActionExecutionsRoute);
     openapi.post('/user/actions/:actionId/execute', ExecuteUserEmailActionRoute);
+    openapi.post('/user/actions/:actionId/snooze', SnoozeEmailActionRoute);
+    openapi.post('/user/actions/:actionId/schedule', ScheduleEmailActionRoute);
 
     openapi.get('/user/processing/task-runs', ListBackgroundTaskRunsRoute);
     openapi.get('/user/processing/calendar-events', ListProcessingCalendarEventsRoute);

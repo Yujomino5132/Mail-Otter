@@ -110,6 +110,15 @@ const EmailActionListQuerySchema = z.object({
     ])
     .optional(),
   cursor: nonEmptyStringSchema('cursor', 64).optional(),
+  showSnoozed: z.coerce.boolean().optional().default(false),
+});
+
+const ActionSnoozeBodySchema = z.object({
+  snoozedUntil: z.string().datetime().nullable(),
+});
+
+const ActionScheduleBodySchema = z.object({
+  scheduledFor: z.string().datetime().nullable(),
 });
 
 const OAuth2AuthorizeBodySchema = z.object({
@@ -206,6 +215,8 @@ const RequestInputSchemas: Record<string, RequestInputSchema> = {
   'GET /user/actions': { query: EmailActionListQuerySchema },
   'GET /user/actions/:actionId/executions': {},
   'POST /user/actions/:actionId/execute': {},
+  'POST /user/actions/:actionId/snooze': { body: ActionSnoozeBodySchema },
+  'POST /user/actions/:actionId/schedule': { body: ActionScheduleBodySchema },
   'POST /user/application/oauth2/authorize': { body: OAuth2AuthorizeBodySchema },
   'GET /user/application/folders': { query: AppFoldersQuerySchema },
   'GET /user/application/integrations': { query: AppIntegrationsQuerySchema },
@@ -225,5 +236,12 @@ const RequestInputSchemas: Record<string, RequestInputSchema> = {
   'POST /api/webhooks/outlook/lifecycle/:applicationId': { query: OutlookWebhookQuerySchema, body: OutlookWebhookBodySchema },
 };
 
-export { ApplicationRulesQuerySchema, RequestInputSchemas, SuggestApplicationRuleBodySchema, UpdateApplicationRulesBodySchema };
+export {
+  ActionScheduleBodySchema,
+  ActionSnoozeBodySchema,
+  ApplicationRulesQuerySchema,
+  RequestInputSchemas,
+  SuggestApplicationRuleBodySchema,
+  UpdateApplicationRulesBodySchema,
+};
 export type { RequestInputSchema };

@@ -184,6 +184,8 @@ export default function SpaApp() {
               setApplicationId={actions.setActionApplicationId}
               status={actions.actionStatus}
               setStatus={actions.setActionStatus}
+              showSnoozed={actions.showSnoozed}
+              setShowSnoozed={actions.setShowSnoozed}
               actions={actions.actions}
               actionsCursor={actions.actionsCursor}
               selectedActionId={actions.selectedActionId}
@@ -192,6 +194,8 @@ export default function SpaApp() {
               onLoadMore={() => actions.loadActions(true, actions.actionsCursor)}
               onSelectAction={actions.loadActionExecutions}
               onExecuteAction={actions.executeAction}
+              onSnoozeAction={actions.snoozeAction}
+              onScheduleAction={actions.scheduleAction}
               busy={isBusy}
             />
           )}

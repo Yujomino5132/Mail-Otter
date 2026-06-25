@@ -67,6 +67,7 @@ class EmailActionDAO extends EncryptedDAO {
 
   public async listActionsForUser(userEmail: string, input: ListEmailActionsInput = {}): Promise<EmailActionList> {
     const limit: number = Math.min(Math.max(input.limit ?? 25, 1), 100);
+    const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
     const conditions: string[] = ['user_email = ?'];
     const bindings: Array<string | number> = [userEmail];
     if (input.applicationId) {
@@ -76,6 +77,10 @@ class EmailActionDAO extends EncryptedDAO {
     if (input.status) {
       conditions.push('status = ?');
       bindings.push(input.status);
+    }
+    if (!input.showSnoozed) {
+      conditions.push('(snoozed_until IS NULL OR snoozed_until <= ?)');
+      bindings.push(now);
     }
     const cursor = EmailActionDAO.parseCursor(input.cursor);
     if (cursor) {
@@ -284,6 +289,102 @@ class EmailActionDAO extends EncryptedDAO {
     return Promise.all(rows.map((row: EmailActionInternal): Promise<EmailAction> => this.toAction(row)));
   }
 
+  public async snoozeAction(actionId: string, snoozedUntil: number, newExpiresAt: number): Promise<boolean> {
+    const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    const result: D1Result = await executeD1WithRetry(
+      (): Promise<D1Result> =>
+        this.database
+          .prepare(
+            `
+              UPDATE email_summary_actions
+              SET snoozed_until = ?, expires_at = MAX(expires_at, ?), updated_at = ?
+              WHERE action_id = ? AND status = ?
+            `,
+          )
+          .bind(snoozedUntil, newExpiresAt, now, actionId, EMAIL_ACTION_STATUS_PENDING)
+          .run(),
+      'snooze email action',
+    );
+    return ((result.meta as { changes?: number })?.changes ?? 0) > 0;
+  }
+
+  public async cancelSnooze(actionId: string): Promise<boolean> {
+    const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    const result: D1Result = await executeD1WithRetry(
+      (): Promise<D1Result> =>
+        this.database
+          .prepare(
+            `
+              UPDATE email_summary_actions
+              SET snoozed_until = NULL, updated_at = ?
+              WHERE action_id = ? AND status = ?
+            `,
+          )
+          .bind(now, actionId, EMAIL_ACTION_STATUS_PENDING)
+          .run(),
+      'cancel email action snooze',
+    );
+    return ((result.meta as { changes?: number })?.changes ?? 0) > 0;
+  }
+
+  public async scheduleAction(actionId: string, scheduledFor: number, newExpiresAt: number): Promise<boolean> {
+    const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    const result: D1Result = await executeD1WithRetry(
+      (): Promise<D1Result> =>
+        this.database
+          .prepare(
+            `
+              UPDATE email_summary_actions
+              SET scheduled_for = ?, expires_at = MAX(expires_at, ?), updated_at = ?
+              WHERE action_id = ? AND status = ?
+            `,
+          )
+          .bind(scheduledFor, newExpiresAt, now, actionId, EMAIL_ACTION_STATUS_PENDING)
+          .run(),
+      'schedule email action',
+    );
+    return ((result.meta as { changes?: number })?.changes ?? 0) > 0;
+  }
+
+  public async cancelSchedule(actionId: string): Promise<boolean> {
+    const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
+    const result: D1Result = await executeD1WithRetry(
+      (): Promise<D1Result> =>
+        this.database
+          .prepare(
+            `
+              UPDATE email_summary_actions
+              SET scheduled_for = NULL, updated_at = ?
+              WHERE action_id = ? AND status = ?
+            `,
+          )
+          .bind(now, actionId, EMAIL_ACTION_STATUS_PENDING)
+          .run(),
+      'cancel email action schedule',
+    );
+    return ((result.meta as { changes?: number })?.changes ?? 0) > 0;
+  }
+
+  public async listPendingScheduledActions(now: number, limit: number): Promise<EmailAction[]> {
+    const rows: EmailActionInternal[] = await this.database
+      .prepare(
+        `
+          SELECT ${EmailActionDAO.actionColumns}
+          FROM email_summary_actions
+          WHERE status = ?
+            AND scheduled_for IS NOT NULL
+            AND scheduled_for <= ?
+            AND (snoozed_until IS NULL OR snoozed_until <= ?)
+          ORDER BY scheduled_for ASC
+          LIMIT ?
+        `,
+      )
+      .bind(EMAIL_ACTION_STATUS_PENDING, now, now, limit)
+      .all<EmailActionInternal>()
+      .then((result: D1Result<EmailActionInternal>): EmailActionInternal[] => result.results || []);
+    return Promise.all(rows.map((row: EmailActionInternal): Promise<EmailAction> => this.toAction(row)));
+  }
+
   public async updateSyncStatus(actionId: string, syncStatus: string): Promise<void> {
     const now: number = TimestampUtil.getCurrentUnixTimestampInSeconds();
     await executeD1WithRetry(
@@ -453,6 +554,8 @@ class EmailActionDAO extends EncryptedDAO {
       result,
       errorMessage: row.error_message,
       syncStatus: row.sync_status,
+      snoozedUntil: row.snoozed_until,
+      scheduledFor: row.scheduled_for,
       expiresAt: row.expires_at,
       executedAt: row.executed_at,
       createdAt: row.created_at,
@@ -507,6 +610,8 @@ class EmailActionDAO extends EncryptedDAO {
     'result_salt',
     'error_message',
     'sync_status',
+    'snoozed_until',
+    'scheduled_for',
     'expires_at',
     'executed_at',
     'created_at',
@@ -534,6 +639,7 @@ interface ListEmailActionsInput {
   status?: EmailActionStatus;
   cursor?: string;
   limit?: number;
+  showSnoozed?: boolean;
 }
 
 interface RecordEmailActionExecutionInput {

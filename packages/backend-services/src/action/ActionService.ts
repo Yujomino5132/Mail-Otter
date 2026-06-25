@@ -5,6 +5,7 @@ import { createActionsForSummary } from './ActionCreationService';
 import { renderActionItems, renderEmailActionSection } from './ActionRenderService';
 import { getConfirmationResponse, executeActionWithToken, executeActionForUser, autoExecuteCreatedActions } from './ActionExecutionService';
 import { expirePendingActions, deleteOldActions } from './ActionMaintenanceService';
+import { snoozeAction, scheduleAction, executeScheduledActions } from './ActionSchedulingService';
 
 export type {
   ActionCallbackEnv,
@@ -20,11 +21,13 @@ export type {
 } from './ActionCreationService';
 
 export type { ActionMaintenanceEnv } from './ActionMaintenanceService';
+export type { ActionSchedulingEnv, ScheduledExecutionResult } from './ActionSchedulingService';
 
 interface ListActionsInput {
   applicationId?: string;
   status?: EmailActionStatus;
   cursor?: string;
+  showSnoozed?: boolean;
 }
 
 type UserActionListEnv = import('./ActionServiceUtils').ActionDAOEnv;
@@ -39,6 +42,9 @@ class ActionService {
   public static executeActionForUser = executeActionForUser;
   public static expirePendingActions = expirePendingActions;
   public static deleteOldActions = deleteOldActions;
+  public static snoozeAction = snoozeAction;
+  public static scheduleAction = scheduleAction;
+  public static executeScheduledActions = executeScheduledActions;
 
   public static async listActionsForUser(userEmail: string, input: ListActionsInput, env: UserActionListEnv): Promise<EmailActionList> {
     const dao = await createActionDAO(env);

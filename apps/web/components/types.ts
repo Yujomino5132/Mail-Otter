@@ -147,7 +147,7 @@ export type EmailActionType =
   | 'travel.track_flight'
   | 'finance.pay_bill'
   | 'appointment.confirm';
-export type EmailActionExecutionTrigger = 'email_callback' | 'web_ui' | 'system_expiry' | 'auto_execute';
+export type EmailActionExecutionTrigger = 'email_callback' | 'web_ui' | 'system_expiry' | 'auto_execute' | 'scheduled';
 
 export interface ApplicationContextDocument {
   contextDocumentId: string;
@@ -217,6 +217,8 @@ export interface EmailAction {
     externalUrl?: string;
   } | null;
   errorMessage?: string | null;
+  snoozedUntil?: number | null;
+  scheduledFor?: number | null;
   expiresAt: number;
   executedAt?: number | null;
   createdAt: number;

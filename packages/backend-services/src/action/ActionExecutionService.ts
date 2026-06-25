@@ -4,6 +4,7 @@ import {
   EMAIL_ACTION_STATUS_SUCCEEDED,
   EMAIL_ACTION_TRIGGER_AUTO_EXECUTE,
   EMAIL_ACTION_TRIGGER_EMAIL_CALLBACK,
+  EMAIL_ACTION_TRIGGER_SCHEDULED,
   EMAIL_ACTION_TRIGGER_WEB_UI,
   EMAIL_ACTION_TYPE_APPOINTMENT_CONFIRM,
   EMAIL_ACTION_TYPE_CALENDAR_ADD_EVENT,
@@ -145,7 +146,11 @@ async function executeProviderOperation(action: EmailAction, env: ActionExecutio
 
 async function executeAction(
   action: EmailAction,
-  triggeredBy: typeof EMAIL_ACTION_TRIGGER_EMAIL_CALLBACK | typeof EMAIL_ACTION_TRIGGER_WEB_UI | typeof EMAIL_ACTION_TRIGGER_AUTO_EXECUTE,
+  triggeredBy:
+    | typeof EMAIL_ACTION_TRIGGER_EMAIL_CALLBACK
+    | typeof EMAIL_ACTION_TRIGGER_WEB_UI
+    | typeof EMAIL_ACTION_TRIGGER_AUTO_EXECUTE
+    | typeof EMAIL_ACTION_TRIGGER_SCHEDULED,
   request: Request | null,
   env: ActionExecutionEnv,
 ): Promise<EmailAction> {

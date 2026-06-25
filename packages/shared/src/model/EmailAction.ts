@@ -17,6 +17,8 @@ interface EmailAction {
   result?: EmailActionResult | null;
   errorMessage?: string | null;
   syncStatus?: string | null;
+  snoozedUntil?: number | null;
+  scheduledFor?: number | null;
   expiresAt: number;
   executedAt?: number | null;
   createdAt: number;
@@ -43,6 +45,8 @@ interface EmailActionInternal {
   result_salt: string | null;
   error_message: string | null;
   sync_status: string | null;
+  snoozed_until: number | null;
+  scheduled_for: number | null;
   expires_at: number;
   executed_at: number | null;
   created_at: number;
