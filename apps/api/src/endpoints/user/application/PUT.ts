@@ -40,7 +40,7 @@ interface UpdateApplicationRequest extends IRequest {
   imapPassword?: string;
   smtpHost?: string;
   smtpPort?: number;
-  enabledFeatures?: string[];
+  enabledFeatures?: string[] | null;
   timeZone?: string;
   senderDomainFilters?: SenderDomainFilters | null;
   autoExecuteActionTypes?: string[] | null;

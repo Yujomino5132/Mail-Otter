@@ -32,7 +32,7 @@ const UpdateAppBodySchema = z
     clientId: z.string().max(512).optional(),
     clientSecret: z.string().max(2048).optional(),
     gmailPubsubTopicName: GmailPubsubTopicNameSchema.optional(),
-    enabledFeatures: z.array(z.string()).optional(),
+    enabledFeatures: z.array(z.string()).optional().nullable(),
     senderDomainFilters: z
       .object({
         includeRules: z.array(z.string().max(320)).max(100),
