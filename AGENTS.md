@@ -1,247 +1,187 @@
 # AGENTS.md
 
-Guidance for agents working in Mail-Otter.
+Guidance for agents working in Mail-Otter. `CLAUDE.md` is a symbolic link to this file.
 
 ## Overview
 
-Mail-Otter is a Cloudflare Worker API with a Vite React management UI in a pnpm workspace. Cloudflare Zero Trust protects `/user/*`; public provider webhook endpoints under `/api/*` validate provider secrets/client state and enqueue work. Emails are summarized via Workers AI with optional RAG context indexing. The AI can suggest structured email actions (add calendar event, draft reply, open link, manual to-do, track package, track flight, pay bill, confirm appointment) that the user confirms or denies through a public callback flow or the management UI. Per-mailbox time zones keep calendar events correct, optional sender domain filters scope which senders are processed, configurable email processing rules gate or modify per-message handling, a scheduled daily digest aggregates pending actions and calendar events, outbound webhook integrations forward summary payloads to external services, a usage analytics dashboard summarizes AI usage, processing, actions, and context indexing, attachment vision analysis uses `@cf/meta/llama-3.2-11b-vision-instruct` to extract structured data from image attachments (receipts, invoices, boarding passes, package labels) with a per-mailbox toggle, action scheduling/snooze lets users defer pending actions to a future time or schedule `calendar.add_event`/`email.draft_reply` actions for automatic execution at a chosen time, background Google Drive and OneDrive document ingestion syncs Drive/OneDrive files into the RAG context index via optional per-mailbox OAuth2 feature toggles (`google_drive` for Gmail, `onedrive` for Outlook) requiring re-authorization, a unified **Activity Feed** view (`GET /user/activity`) that aggregates email processing outcomes, action creations, and action executions into a reverse-chronological timeline with per-mailbox filtering, event-type filtering, cursor pagination, and CSV export, and an **AI Email Chat** feature (`POST /user/chat`) that lets users ask natural-language questions about their emails by querying the existing Vectorize RAG index and generating grounded answers with source citations using the same Workers AI models used for summarization.
+Mail-Otter is a Cloudflare Worker API + Vite React SPA in a pnpm workspace. Features:
+
+- **Core**: Cloudflare Zero Trust on `/user/*`; provider webhooks under `/api/*` validate secrets and enqueue work; emails summarized via Workers AI with optional RAG (Vectorize) context indexing.
+- **Actions**: AI proposes structured actions (`calendar.add_event`, `email.draft_reply`, `external.open_link`, `manual.todo`, `delivery.track_package`, `travel.track_flight`, `finance.pay_bill`, `appointment.confirm`) confirmed via public callback or the management UI.
+- **Scheduling/Snooze**: defer pending actions or schedule `calendar.add_event`/`email.draft_reply` for automatic future execution.
+- **Attachment Vision**: `@cf/meta/llama-3.2-11b-vision-instruct` extracts summaries and action proposals from image attachments; per-mailbox toggle.
+- **Sender Filters**: optional include/exclude domain rules per mailbox.
+- **Processing Rules**: up to 20 per-mailbox rules (pre- and post-processing phases).
+- **Daily Digest**: scheduled email aggregating pending actions and calendar events.
+- **Outbound Integrations**: webhook forwarding of summary payloads to external services.
+- **Drive Ingestion**: Google Drive (`google_drive` feature) and OneDrive (`onedrive` feature) sync files into the RAG index via background cron tasks.
+- **Activity Feed**: `GET /user/activity` — reverse-chronological timeline of email processing, action creation, and action execution events; per-mailbox and event-type filtering, cursor pagination, CSV export.
+- **AI Email Chat**: `POST /user/chat` — natural-language questions over indexed emails answered with Vectorize RAG + Workers AI; multi-turn via `history` array; source citations in response.
 
 ## Cloudflare Documentation
 
-STOP. Cloudflare Workers APIs, limits, and product behavior change frequently. Before any Workers, KV, R2, D1, Durable Objects, Queues, Vectorize, Workers AI, or Agents SDK task, retrieve current official documentation.
+**STOP.** APIs, limits, and behavior change frequently. Before any Workers, KV, R2, D1, Durable Objects, Queues, Vectorize, Workers AI, or Agents SDK task, retrieve current official docs.
 
-- Workers docs: https://developers.cloudflare.com/workers/
-- Cloudflare MCP docs: https://docs.mcp.cloudflare.com/mcp
-- Node.js compatibility: https://developers.cloudflare.com/workers/runtime-apis/nodejs/
+- Workers: https://developers.cloudflare.com/workers/
+- Cloudflare MCP: https://docs.mcp.cloudflare.com/mcp
+- Node.js compat: https://developers.cloudflare.com/workers/runtime-apis/nodejs/
 - Worker errors: https://developers.cloudflare.com/workers/observability/errors/
-
-For limits and quotas, retrieve the product's current `/platform/limits/` page, for example `/workers/platform/limits/`.
-
-Retrieve API references and limits from the relevant product docs:
-
-- `/workers/`
-- `/kv/`
-- `/r2/`
-- `/d1/`
-- `/durable-objects/`
-- `/queues/`
-- `/vectorize/`
-- `/workers-ai/`
-- `/agents/`
-
-Error-specific guidance:
-
-- Error 1102 means CPU or memory was exceeded; retrieve current limits from `/workers/platform/limits/`.
-- For any other Worker error, use the current Worker errors docs.
-
-If this application starts using Durable Objects or Workflows, also consult:
-
-- Durable Objects best practices: https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/
-- Workflows best practices: https://developers.cloudflare.com/workflows/build/rules-of-workflows/
+- Limits: retrieve each product's `/platform/limits/` page (e.g. `/workers/platform/limits/`)
+- Product refs: `/workers/`, `/kv/`, `/r2/`, `/d1/`, `/durable-objects/`, `/queues/`, `/vectorize/`, `/workers-ai/`, `/agents/`
+- Error 1102 = CPU/memory exceeded; see `/workers/platform/limits/`.
+- Durable Objects: https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/
+- Workflows: https://developers.cloudflare.com/workflows/build/rules-of-workflows/
 
 ## Commands
 
-Always source the user's toolchain setup before Node, pnpm, npm, npx, or Wrangler commands:
+Always source toolchain before any Node/pnpm/npm/npx/Wrangler command:
 
 ```bash
 source ~/.customrc
 volta run pnpm install
 volta run pnpm run dev
 volta run pnpm run build
-volta run pnpm run typegen
+volta run pnpm run typegen   # run after changing wrangler bindings
 volta run pnpm run deploy
 ```
 
-For verification (typecheck, lint, and tests with coverage), run only:
+Verification (typecheck + lint + tests + integration tests):
 
 ```bash
-volta run pnpm -r typecheck && pnpm run lint && pnpm run test:coverage
+volta run pnpm -r typecheck && pnpm run lint && pnpm run test:coverage && pnpm run test:integration
 ```
 
-Cloudflare command equivalents:
-
-| Command                         | Purpose                   |
-| ------------------------------- | ------------------------- |
-| `volta run npx wrangler dev`    | Local Worker development  |
-| `volta run npx wrangler deploy` | Deploy to Cloudflare      |
-| `volta run npx wrangler types`  | Generate TypeScript types |
-
-Run `volta run pnpm run typegen` after changing bindings in Wrangler config.
+| Command | Purpose |
+|---|---|
+| `volta run npx wrangler dev` | Local Worker dev |
+| `volta run npx wrangler deploy` | Deploy to Cloudflare |
+| `volta run npx wrangler types` | Generate TS types |
 
 ## Architecture
 
-- `apps/api/src/index.ts` exports `fetch`, `scheduled`, and `queue` handlers via `MailOtterWorker` and `EmailEventsDispatcherWorker`. Also re-exports `CronTasksWorker`, `EmailProcessingWorkflow`, `OAuth2TokenRefreshWorker` from `@mail-otter/background` for Durable Object / Workflow class bindings.
-- `apps/api/src/types.d.ts` declares `type Env = CloudflareEnv` globally.
-- `apps/api/src/workers/MailOtterWorker.ts` registers Hono + Chanfana routes, handles D1 sessions, and routes cron triggers to the `CronTasksWorker` Durable Object.
-- `apps/api/src/endpoints/` contains file-routed endpoint classes (see route listing below).
-- `apps/api/src/middleware/` owns request middleware, including Cloudflare Access user authentication.
-- `apps/api/src/generated/spa-shell.ts` is generated by the web build; do not edit it manually.
-- `apps/background/src/CronTasksWorker.ts` is the Durable Object that serializes cron executions in two phases. Phase 1 (parallel): `OAuth2AccessTokenRefreshTask`, `ContextDocumentPruningTask`, `ImapPollingTask`, `CalendarEventSyncTask`, `GoogleDriveSyncTask`, `OneDriveSyncTask`, `ActionStatusSyncTask`, `SubscriptionRenewalUtil.renewDueSubscriptions`. Phase 2 (parallel): `ProcessedMessagePruningTask`, `StaleContextDocumentPruningTask`, `OAuth2SessionPruningTask`, `ContextDeletionRunPruningTask`, `AiDailyUsagePruningTask`, `EmailActionPruningTask`, `AuditLogPruningTask`, `IntegrationDeliveryLogPruningTask`, `ScheduledDigestTask`, `SyncedCalendarEventPruningTask`, `BackgroundTaskRunPruningTask`, `ScheduledActionExecutionTask`.
-- `apps/background/src/EmailEventsDispatcherWorker.ts` is the Queue consumer that dispatches events to `EmailProcessingWorkflow`.
-- `apps/background/src/EmailProcessingWorkflow.ts` is the Workflow that resolves applications, lists Gmail/Outlook/Fastmail messages, summarizes with Workers AI, and posts summary replies.
-- `apps/background/src/OAuth2TokenRefreshWorker.ts` is the Durable Object that handles OAuth2 token refresh and authorization code exchange.
-- `apps/web/` contains the Vite React SPA for `/user`. `apps/web/src/components/` is organized by feature area: `actions/`, `analytics/`, `context/`, `layout/`, `mailboxes/`, `modals/`, `shared/`, `ui/`, and `views/` (`ActionsView`, `ActivityView`, `AnalyticsView`, `ChatView`, `ContextAuditView`, `HelpView`, `MailboxesView`, `ProcessingView`).
-- `packages/shared/src/` contains cross-package constants, models, schemas, and utilities (including `TimeZoneUtil`, `TimestampUtil`, `UUIDUtil`, `BaseUrlUtil`, `CryptoUtil`).
-- `packages/backend-errors/src/` owns a typed error hierarchy (`BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `InternalServerError`, `DatabaseError`, `EmailProcessingError` with retryable/non-retryable variants).
-- `packages/backend-runtime/src/` owns all environment variable access via `ConfigurationManager` static methods and defaults in `ConfigurationDefaults.ts`. Also provides abstract worker base classes (`AbstractEntrypointWorker`, `AbstractDurableObjectWorker`, `AbstractQueueWorker`, `AbstractWorkflowWorker`) and DO naming constants. Add new env vars in `ConfigurationDefaults.ts`, not inline.
-- `packages/backend-data/src/` owns all D1 access via DAO classes in `dao/` (`ConnectedApplicationDAO`, `ApplicationContextDAO`, `UserDAO`, `ProcessedMessageDAO`, `OAuth2AuthorizationSessionDAO`, `ProviderSubscriptionDAO`, `AiDailyUsageDAO`, `EmailActionDAO`, `OAuth2AccessTokenCacheDAO`, `OAuth2AccessTokenRefreshStatusDAO`, `ApplicationIntegrationDAO`, `BackgroundTaskRunDAO`, `IntegrationDeliveryLogDAO`, `SyncedCalendarEventDAO`, `ActivityDAO`), KV-based token cache, D1 session/cursor/error utilities in `utils/` (`D1SessionUtil`, `CursorUtil`, `D1ErrorClassifier`, `D1Utils`), and AES-GCM encryption in `crypto/` (`CryptoService`). Per-application settings without dedicated columns (e.g. `calendar_time_zone`, enabled features, sender domain filters, processing rules) are stored as provider-config key/value rows.
-- `packages/provider-clients/src/` owns provider API clients (`GmailProviderUtil`, `OutlookProviderUtil`, `OAuth2ProviderUtil`, `FastmailProviderUtil`, `GoogleDriveProviderUtil`, `OneDriveProviderUtil`), webhook security (`WebhookSecurityUtil`), and email content parsing (`EmailContentUtil`).
-- `packages/backend-services/src/` owns business logic services, organized by domain subdirectory: `activity/` (`ActivityService`), `action/` (`ActionService`, `ActionExecutionService`, `ActionSchedulingService`, `PackageTrackingService`, `FlightTrackingService`), `analytics/` (`AnalyticsService`), `application/` (`ApplicationService`, `ApplicationResponseUtil`, `FolderService`), `auth/` (`EmailValidationUtil`), `chat/` (`ChatService`), `digest/` (`DigestConfigService`, `DigestEmailUtil`, `DigestService`, `ActionStatusSyncUtil`, `CalendarEventSyncUtil`), `drive/` (`GoogleDriveIngestionService`, `OneDriveIngestionService`, `DriveDocumentUtil`), `email/` (`EmailProcessingUtil`, `EmailSummaryOrchestrator`, `EmailSummaryUtil`, `EmailContextUtil`, `EmailRulesUtil`, `EmailRuleSuggestionUtil`, `ContextService`, `AiUsageUtil`, `AttachmentAnalysisUtil`, `SenderFilterUtil`, `ProviderOrganizationService`, `WorkersAiErrorUtil`), `integration/` (`IntegrationService`), `oauth2/` (`OAuth2AuthorizationService`, `OAuth2AccessTokenService`, `OAuth2StateUtil`), `processing/` (`ProcessingService`), `provider/` (`EmailProviderRegistry` + `IEmailProvider`, `GmailEmailProvider`, `OutlookEmailProvider`, `FastmailEmailProvider`, `FastmailImapEmailProvider`), `subscription/` (`WatchService`, `SubscriptionRenewalUtil`), `user/` (`UserService`), and `webhook/` (`GmailWebhookService`, `OutlookWebhookService`). New provider-specific behavior should go behind `EmailProviderRegistry`/`IEmailProvider` rather than branching on provider id in callers.
-- `migrations/` contains D1 migrations (latest: `0025_action_scheduling.sql`).
-- `functions/[[path]].ts` proxies Cloudflare Pages requests to the API Worker through a service binding.
-- `test/` contains Vitest suites for workers, schemas, and utilities.
+**API app** (`apps/api/`):
+- `src/index.ts` — exports `fetch`/`scheduled`/`queue` via `MailOtterWorker` + `EmailEventsDispatcherWorker`; re-exports `CronTasksWorker`, `EmailProcessingWorkflow`, `OAuth2TokenRefreshWorker` for DO/Workflow bindings.
+- `src/types.d.ts` — `type Env = CloudflareEnv` global.
+- `src/workers/MailOtterWorker.ts` — Hono + Chanfana routes, D1 sessions, cron → `CronTasksWorker` DO.
+- `src/endpoints/` — file-routed endpoint classes.
+- `src/middleware/` — request middleware incl. Cloudflare Access auth.
+- `src/generated/spa-shell.ts` — generated by web build; do not edit.
+
+**Background app** (`apps/background/`):
+- `CronTasksWorker.ts` — DO serializing cron in two phases:
+  - Phase 1 (parallel): `OAuth2AccessTokenRefreshTask`, `ContextDocumentPruningTask`, `ImapPollingTask`, `CalendarEventSyncTask`, `GoogleDriveSyncTask`, `OneDriveSyncTask`, `ActionStatusSyncTask`, `SubscriptionRenewalUtil.renewDueSubscriptions`
+  - Phase 2 (parallel): `ProcessedMessagePruningTask`, `StaleContextDocumentPruningTask`, `OAuth2SessionPruningTask`, `ContextDeletionRunPruningTask`, `AiDailyUsagePruningTask`, `EmailActionPruningTask`, `AuditLogPruningTask`, `IntegrationDeliveryLogPruningTask`, `ScheduledDigestTask`, `SyncedCalendarEventPruningTask`, `BackgroundTaskRunPruningTask`, `ScheduledActionExecutionTask`
+- `EmailEventsDispatcherWorker.ts` — Queue consumer → `EmailProcessingWorkflow`.
+- `EmailProcessingWorkflow.ts` — Workflow: resolve apps, list messages, summarize, post replies.
+- `OAuth2TokenRefreshWorker.ts` — DO for token refresh and auth-code exchange.
+
+**Web app** (`apps/web/`): Vite React SPA for `/user`. Components organized under `src/components/`: `actions/`, `analytics/`, `context/`, `layout/`, `mailboxes/`, `modals/`, `shared/`, `ui/`, `views/` (`ActionsView`, `ActivityView`, `AnalyticsView`, `ChatView`, `ContextAuditView`, `HelpView`, `MailboxesView`, `ProcessingView`).
+
+**Packages**:
+- `shared/` — cross-package constants, models, schemas, utils (`TimeZoneUtil`, `TimestampUtil`, `UUIDUtil`, `BaseUrlUtil`, `CryptoUtil`).
+- `backend-errors/` — typed error hierarchy (`BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `InternalServerError`, `DatabaseError`, `EmailProcessingError`).
+- `backend-runtime/` — `ConfigurationManager` + defaults in `ConfigurationDefaults.ts` (add new env vars here, not inline); abstract worker base classes; DO naming constants.
+- `backend-data/` — all D1 access via DAOs: `ConnectedApplicationDAO`, `ApplicationContextDAO`, `UserDAO`, `ProcessedMessageDAO`, `OAuth2AuthorizationSessionDAO`, `ProviderSubscriptionDAO`, `AiDailyUsageDAO`, `EmailActionDAO`, `OAuth2AccessTokenCacheDAO`, `OAuth2AccessTokenRefreshStatusDAO`, `ApplicationIntegrationDAO`, `BackgroundTaskRunDAO`, `IntegrationDeliveryLogDAO`, `SyncedCalendarEventDAO`, `ActivityDAO`; KV token cache; utils `D1SessionUtil`, `CursorUtil`, `D1ErrorClassifier`, `D1Utils`; `CryptoService` (AES-GCM). Per-app settings without columns (time zone, features, filters, rules) → provider-config key/value rows.
+- `provider-clients/` — `GmailProviderUtil`, `OutlookProviderUtil`, `OAuth2ProviderUtil`, `FastmailProviderUtil`, `GoogleDriveProviderUtil`, `OneDriveProviderUtil`, `WebhookSecurityUtil`, `EmailContentUtil`.
+- `backend-services/` — business logic by domain: `activity/` (`ActivityService`), `action/` (`ActionService`, `ActionExecutionService`, `ActionSchedulingService`, `PackageTrackingService`, `FlightTrackingService`), `analytics/` (`AnalyticsService`), `application/` (`ApplicationService`, `ApplicationResponseUtil`, `FolderService`), `auth/` (`EmailValidationUtil`), `chat/` (`ChatService`), `digest/` (`DigestConfigService`, `DigestEmailUtil`, `DigestService`, `ActionStatusSyncUtil`, `CalendarEventSyncUtil`), `drive/` (`GoogleDriveIngestionService`, `OneDriveIngestionService`, `DriveDocumentUtil`), `email/` (`EmailProcessingUtil`, `EmailSummaryOrchestrator`, `EmailSummaryUtil`, `EmailContextUtil`, `EmailRulesUtil`, `EmailRuleSuggestionUtil`, `ContextService`, `AiUsageUtil`, `AttachmentAnalysisUtil`, `SenderFilterUtil`, `ProviderOrganizationService`, `WorkersAiErrorUtil`), `integration/` (`IntegrationService`), `oauth2/` (`OAuth2AuthorizationService`, `OAuth2AccessTokenService`, `OAuth2StateUtil`), `processing/` (`ProcessingService`), `provider/` (`EmailProviderRegistry` + `IEmailProvider`, `GmailEmailProvider`, `OutlookEmailProvider`, `FastmailEmailProvider`, `FastmailImapEmailProvider`), `subscription/` (`WatchService`, `SubscriptionRenewalUtil`), `user/` (`UserService`), `webhook/` (`GmailWebhookService`, `OutlookWebhookService`). New provider behavior → `EmailProviderRegistry`/`IEmailProvider`, not branch on provider id.
+
+**Other**: `migrations/` (latest: `0025_action_scheduling.sql`), `functions/[[path]].ts` (Pages → API Worker proxy), `test/` (Vitest suites).
 
 ## Import Direction
-
-Packages are organized in layers. Higher layers may import from lower layers; lower layers must not import upward.
 
 ```
 Layer 0: shared, backend-errors          — zero @mail-otter/* deps
 Layer 1: backend-runtime                 → layer 0 only
 Layer 2: backend-data, provider-clients  → layer 0 only
 Layer 3: backend-services                → layers 0–2 (not apps)
-Layer 5: apps/background                 → layers 0–3 (including provider-clients directly)
+Layer 5: apps/background                 → layers 0–3 (provider-clients OK)
          apps/api                        → layers 0–3 + background (NOT provider-clients directly)
 ```
 
-Enforced by ESLint `no-restricted-imports` rules in `eslint.config.mjs`.
+Enforced by ESLint `no-restricted-imports` in `eslint.config.mjs`.
 
 ## Build And Runtime Notes
 
-- The root package is `@mail-otter/monorepo` and uses pnpm workspaces.
-- Root `pnpm run dev` starts the Vite SPA through `@mail-otter/web`.
-- `apps/web/vite.config.ts` proxies `/api` to `http://localhost:8787` during SPA development.
-- `apps/web/vite.config.ts` embeds `apps/web/dist/index.html` into `apps/api/src/generated/spa-shell.ts` during web builds.
-- `apps/api/wrangler.template.jsonc` is the Worker config template. Copy it to `wrangler.jsonc` for deployment; keep bindings and generated types in sync. There is no separate `wrangler.jsonc` committed — each deployer creates their own.
-- The SPA is served from Cloudflare assets (`assets.directory = "./apps/web/dist/"`) when deployed; `SERVE_SPA_FROM_WORKER` (default `true`) serves the SPA from the Worker catch-all route so API routes are not intercepted by the assets handler.
-- Current Worker bindings include D1 binding `DB`, KV namespace `OAUTH2_TOKEN_CACHE`, Secrets Store secrets `AES_ENCRYPTION_KEY_SECRET`, `ACTION_ENCRYPTION_KEY_SECRET`, `ACTION_SIGNING_SECRET`, Workers AI binding `AI`, Vectorize index `EMAIL_CONTEXT_INDEX`, Queue `EMAIL_EVENTS_QUEUE`, Workflow `EMAIL_PROCESSING_WORKFLOW`, Durable Objects `CRON_TASKS` and `OAUTH2_TOKEN_REFRESHERS`, and a cron trigger `*/10 * * * *`.
-- Attachment vision env vars (all optional, governed by `ConfigurationManager`): `ATTACHMENT_VISION_ENABLED` (default `true`), `ATTACHMENT_VISION_MODEL` (default `@cf/meta/llama-3.2-11b-vision-instruct`), `MAX_ATTACHMENT_SIZE_BYTES` (default `2097152` / 2 MB), `MAX_ATTACHMENTS_PER_EMAIL` (default `3`).
-- Drive ingestion env vars (all optional): `MAX_DRIVE_FILES_PER_SYNC` (default `20`) — max files processed per application per cron cycle for both Google Drive and OneDrive.
-- Chat env vars (all optional): `CHAT_MAX_RESPONSE_TOKENS` (default `1000`), `CHAT_VECTOR_QUERY_TOP_K` (default `20`), `CHAT_CONTEXT_TOP_K` (default `5`), `CHAT_MAX_HISTORY_MESSAGES` (default `10`).
+- Root package `@mail-otter/monorepo`, pnpm workspaces.
+- `apps/web/vite.config.ts` proxies `/api` → `http://localhost:8787` in dev; embeds `dist/index.html` into `apps/api/src/generated/spa-shell.ts` on build.
+- `apps/api/wrangler.template.jsonc` is the config template — copy to `wrangler.jsonc` per deployer; no committed `wrangler.jsonc`.
+- `SERVE_SPA_FROM_WORKER` (default `true`) — serves SPA from Worker catch-all so API routes aren't intercepted by assets handler.
+- Worker bindings: D1 `DB`, KV `OAUTH2_TOKEN_CACHE`, Secrets Store `AES_ENCRYPTION_KEY_SECRET` / `ACTION_ENCRYPTION_KEY_SECRET` / `ACTION_SIGNING_SECRET`, AI `AI`, Vectorize `EMAIL_CONTEXT_INDEX`, Queue `EMAIL_EVENTS_QUEUE`, Workflow `EMAIL_PROCESSING_WORKFLOW`, DOs `CRON_TASKS` / `OAUTH2_TOKEN_REFRESHERS`, cron `*/10 * * * *`.
+
+**Optional env vars** (all have defaults in `ConfigurationDefaults.ts`):
+
+| Group | Vars (default) |
+|---|---|
+| Vision | `ATTACHMENT_VISION_ENABLED` (`true`), `ATTACHMENT_VISION_MODEL` (`@cf/meta/llama-3.2-11b-vision-instruct`), `MAX_ATTACHMENT_SIZE_BYTES` (`2097152`), `MAX_ATTACHMENTS_PER_EMAIL` (`3`) |
+| Drive | `MAX_DRIVE_FILES_PER_SYNC` (`20`) |
+| Chat | `CHAT_MAX_RESPONSE_TOKENS` (`1000`), `CHAT_VECTOR_QUERY_TOP_K` (`20`), `CHAT_CONTEXT_TOP_K` (`5`), `CHAT_MAX_HISTORY_MESSAGES` (`10`) |
+| Tracking | `PACKAGE_TRACKING_API_KEY` (`""`), `FLIGHT_TRACKING_API_KEY` (`""`) |
+| Retention | `INTEGRATION_DELIVERY_LOG_RETENTION_DAYS` (`30`), `BACKGROUND_TASK_RUN_RETENTION_DAYS` (`30`) |
+| Auth | `DEV_AUTH_EMAIL` — bypasses Cloudflare Access locally |
 
 ## Auth And Routing
 
-- `/user/*` is protected by Cloudflare Access and reads `Cf-Access-Authenticated-User-Email`.
-- `DEV_AUTH_EMAIL` may be set locally to bypass Access headers.
-- `/docs` and `/openapi.json` are generated by Chanfana.
-- `/api/oauth2/callback/:applicationId` is public because OAuth providers do not send Cloudflare Access headers. It is secured by short-lived one-time state plus PKCE.
-- `/api/actions/:actionId` and `/api/actions/:actionId/execute` are public because email clients render these links. They are secured by encrypted + signed tokens.
-- `/api/webhooks/*` routes are public because providers do not send Cloudflare Access headers. Gmail webhooks use a tokenized URL; Outlook webhooks validate Microsoft Graph `clientState`; Fastmail webhooks are validated by shared secret.
+- `/user/*` — Cloudflare Access, reads `Cf-Access-Authenticated-User-Email`.
+- `DEV_AUTH_EMAIL` bypasses Access locally.
+- `/docs`, `/openapi.json` — Chanfana generated.
+- `/api/oauth2/callback/:applicationId` — public; secured by one-time state + PKCE.
+- `/api/actions/:actionId*` — public (email client links); secured by encrypted + signed tokens.
+- `/api/webhooks/*` — public; Gmail: tokenized URL; Outlook: Graph `clientState`; Fastmail: shared secret.
 
-Protected user routes:
+**Protected (`/user/*`):**
+`GET /user/me` · `GET /user/analytics` · `GET /user/applications` · `POST /user/application` · `PUT /user/application` · `DELETE /user/application` · `PUT /user/application/context` · `POST /user/application/dismiss-error` · `POST /user/application/context/delete-documents` · `GET /user/application/context/documents` · `GET /user/application/context/deletions` · `GET /user/application/context/document/:id/provider-link` · `GET /user/application/context/document/:id/logs` · `GET /user/application/rules` · `PUT /user/application/rules` · `POST /user/application/rules/suggest` · `GET /user/application/labels` · `GET /user/application/digest` · `PUT /user/application/digest` · `POST /user/application/digest/send` · `GET /user/application/integrations` · `POST /user/application/integration` · `PUT /user/application/integration` · `DELETE /user/application/integration` · `POST /user/application/integration/test` · `GET /user/application/integration/deliveries` · `GET /user/actions` · `GET /user/actions/:actionId/executions` · `POST /user/actions/:actionId/execute` · `POST /user/actions/:actionId/snooze` · `POST /user/actions/:actionId/schedule` · `GET /user/activity` · `POST /user/chat` · `GET /user/application/folders` · `PUT /user/application/watch-settings` · `POST /user/application/oauth2/authorize` · `POST /user/application/watch` · `POST /user/application/stop` · `GET /user/processing/task-runs` · `GET /user/processing/calendar-events` · `GET /user/processing/messages` · `POST /user/processing/run-task`
 
-- `GET /user/me`
-- `GET /user/analytics`
-- `GET /user/applications`
-- `POST /user/application`
-- `PUT /user/application`
-- `DELETE /user/application`
-- `PUT /user/application/context`
-- `POST /user/application/dismiss-error`
-- `POST /user/application/context/delete-documents`
-- `GET /user/application/context/documents`
-- `GET /user/application/context/deletions`
-- `GET /user/application/context/document/:contextDocumentId/provider-link`
-- `GET /user/application/context/document/:contextDocumentId/logs`
-- `GET /user/application/rules`
-- `PUT /user/application/rules`
-- `POST /user/application/rules/suggest`
-- `GET /user/application/labels`
-- `GET /user/application/digest`
-- `PUT /user/application/digest`
-- `POST /user/application/digest/send`
-- `GET /user/application/integrations`
-- `POST /user/application/integration`
-- `PUT /user/application/integration`
-- `DELETE /user/application/integration`
-- `POST /user/application/integration/test`
-- `GET /user/application/integration/deliveries`
-- `GET /user/actions`
-- `GET /user/actions/:actionId/executions`
-- `POST /user/actions/:actionId/execute`
-- `POST /user/actions/:actionId/snooze`
-- `POST /user/actions/:actionId/schedule`
-- `GET /user/activity`
-- `POST /user/chat`
-- `GET /user/application/folders`
-- `PUT /user/application/watch-settings`
-- `POST /user/application/oauth2/authorize`
-- `POST /user/application/watch`
-- `POST /user/application/stop`
-- `GET /user/processing/task-runs`
-- `GET /user/processing/calendar-events`
-- `GET /user/processing/messages`
-- `POST /user/processing/run-task`
-
-Public API routes:
-
-- `GET /api/oauth2/callback/:applicationId`
-- `GET /api/actions/:actionId`
-- `POST /api/actions/:actionId/execute`
-- `POST /api/webhooks/fastmail/:applicationId`
-- `POST /api/webhooks/gmail/:applicationId`
-- `GET|POST /api/webhooks/outlook/:applicationId`
-- `GET|POST /api/webhooks/outlook/lifecycle/:applicationId`
+**Public (`/api/*`):**
+`GET /api/oauth2/callback/:applicationId` · `GET /api/actions/:actionId` · `POST /api/actions/:actionId/execute` · `POST /api/webhooks/fastmail/:applicationId` · `POST /api/webhooks/gmail/:applicationId` · `GET|POST /api/webhooks/outlook/:applicationId` · `GET|POST /api/webhooks/outlook/lifecycle/:applicationId`
 
 ## Provider Client Gotchas
 
-### Microsoft Graph API: `internetMessageHeaders` Cannot Be Filtered
+### Microsoft Graph: `internetMessageHeaders` Cannot Be Filtered
 
-The Microsoft Graph API returns `internetMessageHeaders` on messages when requested via `$select`, but **does not support `$filter`** on this property. Using `$filter=internetMessageHeaders/any(...)` returns a 400 error.
+`$filter=internetMessageHeaders/any(...)` → 400. Workaround in `OutlookProviderUtil.findSummaryMessageInFolder`: embed a hex marker in the reply subject and filter on `startswith(subject, '[<marker>]')` (`$filter` on `subject` IS supported).
 
-This affects `OutlookProviderUtil.findSummaryMessageInFolder` in `packages/provider-clients/src/OutlookProviderUtil.ts`. The workaround is to embed a unique hex marker in the reply subject (e.g., `[<marker>] Re: ...`) and filter on `startswith(subject, '[<marker>]')` instead — `$filter` on `subject` IS supported.
-
-When modifying `sendSelfSummaryReply` or related Outlook message-finding logic:
-- Derive the marker via `deriveMessageMarker` (SHA-256 of the message ID, first 8 bytes as hex)
-- Set the marker in the subject when sending replies as `[${marker}] Re: ${originalSubject}`
-- Use `startswith(subject, '[${marker}]')` for the `$filter` parameter
-- The `X-Mail-Otter-Summary` header is still set on outgoing messages for identification during message reads (via `$select`), just not for filtering
+Rules when modifying `sendSelfSummaryReply` / message-finding logic:
+- Marker = `deriveMessageMarker` (SHA-256 of message ID, first 8 bytes as hex).
+- Send subject: `[${marker}] Re: ${originalSubject}`; filter: `startswith(subject, '[${marker}]')`.
+- `X-Mail-Otter-Summary` header still set on outgoing messages for reads via `$select`, not for filtering.
 
 ### Outlook Summary Email Sink Flow
 
-`OutlookProviderUtil.sendSelfSummaryReply` uses a **sink-to-inbox pattern** instead of sending the summary to the user's own mailbox, to avoid noise in Sent Items and the user's normal inbox:
+`sendSelfSummaryReply` uses a **sink-to-inbox pattern**:
 
-1. **Reason**: Sending the summary directly to the user's mailbox clutters Sent Items with self-addressed messages and the summary appears as a new conversation (or as a "sent to self" item) rather than appearing inline in the original thread. Users found this confusing.
+1. Send reply to `{mailboxAddress}+sink@{domain}` (avoids Sent Items noise; plus-addressing supported by M365).
+2. Copy the sent message from Sent Items into Inbox (`POST /me/messages/{id}/copy`, `destinationId: inbox`) — inherits `conversationId`, appears in correct thread.
+3. Delete from Sent Items (always; `DISABLE_DELETE_AFTER_SEND` was removed).
 
-2. **Sink address**: The summary is sent to `{mailboxAddress}+sink@{domain}` (the user's own mailbox with `+sink` appended before the `@`). This leverages email plus-addressing, which Gmail and M365 both support. The sink address keeps the real Inbox clean — users can filter on this address if desired.
-
-3. **Thread preservation via inbox copy**: After sending to the sink address, the sent message is **copied from Sent Items into the Inbox** using `POST /me/messages/{id}/copy` with `destinationId: inbox`. Because `createReply` inherits the original message's `conversationId`, the inbox copy appears in the correct thread as an unread message — as if the summary was a new message in that conversation.
-
-4. **Cleanup**: The sent copy is then deleted from Sent Items so the user only sees the inbox copy in context. The `DISABLE_DELETE_AFTER_SEND` env var was removed — cleanup always happens.
-
-5. **Sequence**: `createReply(with sink)` → `send` → `copy to inbox` → `delete from Sent Items`
-
-The sink derivation is done in `OutlookProviderUtil.sendSelfSummaryReply` by splitting `mailboxAddress` at the last `@` and inserting `+sink`. Callers pass the user's real email; the sink transformation is internal.
+Sequence: `createReply(sink addr)` → `send` → `copy to inbox` → `delete from Sent Items`. Sink derivation is internal to `sendSelfSummaryReply`.
 
 ## Email Actions And Calendar
 
-- During processing, the AI may emit structured actions persisted via `EmailActionDAO` and surfaced in the summary reply and the management UI. Action types are defined in `packages/shared/src/constants/Providers.ts`: `calendar.add_event`, `email.draft_reply`, `external.open_link`, `manual.todo`, `delivery.track_package`, `travel.track_flight`, `finance.pay_bill`, and `appointment.confirm`. Each action carries a typed payload (`EmailActionPayload` in `packages/shared/src/model/EmailAction.ts`), a risk level (`low`/`medium`/`high`), a status, and an execution trigger (`email_callback`, `web_ui`, `system_expiry`).
-- `delivery.track_package` and `travel.track_flight` actions can be actively executed to fetch live tracking data via `PackageTrackingService` (Aftership API, keyed by `PACKAGE_TRACKING_API_KEY`) and `FlightTrackingService` (Aviationstack API, keyed by `FLIGHT_TRACKING_API_KEY`). Both keys default to empty string (feature disabled when empty).
-- Public callback links (`/api/actions/:actionId` and `/api/actions/:actionId/execute`) are encrypted with `ACTION_ENCRYPTION_KEY_SECRET` and signed with `ACTION_SIGNING_SECRET`. The same actions can be executed from the UI via `POST /user/actions/:actionId/execute`.
-- `calendar.add_event` requires the optional `calendar` feature: it is opt-in per application via `enabledFeatures`, which adds provider-specific OAuth scopes from `OAUTH2_FEATURE_SCOPES` in `packages/shared/src/constants/OAuth2Scopes.ts` (`calendar.events` for Gmail, `Calendars.ReadWrite` for Outlook). Enabling a feature changes the requested scopes, so the user must re-authorize.
-- Calendar events are rendered in each mailbox's own time zone. The per-mailbox zone is stored as the `calendar_time_zone` provider-config row, validated/normalized through `TimeZoneUtil` (defaults to `UTC`), and applied by `ActionService`/`EmailSummaryUtil`. Never assume the Worker's UTC clock for event-facing dates.
+- Action types (`packages/shared/src/constants/Providers.ts`): `calendar.add_event`, `email.draft_reply`, `external.open_link`, `manual.todo`, `delivery.track_package`, `travel.track_flight`, `finance.pay_bill`, `appointment.confirm`. Each has typed payload (`EmailActionPayload`), risk level (`low`/`medium`/`high`), status, and trigger (`email_callback`, `web_ui`, `system_expiry`).
+- `delivery.track_package` → `PackageTrackingService` (Aftership, `PACKAGE_TRACKING_API_KEY`); `travel.track_flight` → `FlightTrackingService` (Aviationstack, `FLIGHT_TRACKING_API_KEY`). Empty key = feature disabled.
+- Action callbacks encrypted with `ACTION_ENCRYPTION_KEY_SECRET`, signed with `ACTION_SIGNING_SECRET`.
+- `calendar.add_event` requires optional `calendar` feature (`enabledFeatures`), adds OAuth scopes (`calendar.events` Gmail / `Calendars.ReadWrite` Outlook) — triggers re-auth.
+- Calendar dates use per-mailbox time zone (`calendar_time_zone` provider-config row, via `TimeZoneUtil`, default `UTC`). Never assume UTC.
 
 ## Attachment Vision Analysis
 
-When a processed email has image attachments, `AttachmentAnalysisUtil` (`packages/backend-services/src/email/`) invokes `@cf/meta/llama-3.2-11b-vision-instruct` — one AI call per image — to extract a one-sentence summary and structured action proposals (`finance.pay_bill`, `delivery.track_package`, `travel.track_flight`, `appointment.confirm`, `manual.todo`). Vision proposals are appended to text proposals before the action-creation cap is applied; text proposals fill the cap first.
+`AttachmentAnalysisUtil` (`packages/backend-services/src/email/`) calls `@cf/meta/llama-3.2-11b-vision-instruct` (one call per image) for a one-sentence summary and action proposals. Vision proposals append after text proposals before the action cap.
 
-Two-level gate controls execution:
-1. Global env var: `ATTACHMENT_VISION_ENABLED` (default `true`). Set to `false` to disable vision entirely.
-2. Per-mailbox toggle: `attachment_vision_enabled` provider-config row. Managed via the same `PUT /user/application/context` endpoint and the **Analyze Image Attachments** checkbox in ContextSection. Default (absent/`null`) = enabled; `'false'` = disabled.
+Gates:
+1. Global: `ATTACHMENT_VISION_ENABLED` (default `true`).
+2. Per-mailbox: `attachment_vision_enabled` provider-config row (`null`/absent = enabled, `'false'` = disabled). Managed via `PUT /user/application/context` / **Analyze Image Attachments** checkbox.
 
-Provider attachment fetching lives in `EmailProcessingUtil` (Layer 5), using:
-- `GmailProviderUtil.getImageAttachments()` — walks `payload.parts` recursively, fetches via Gmail Attachments API, converts base64url → base64.
-- `OutlookProviderUtil.getImageAttachments()` — calls `GET .../messages/{id}/attachments?$select=id,name,contentType,contentBytes,size`.
-- `FastmailProviderUtil.downloadImageAttachments()` — uses JMAP `Email/get` `attachments` property and downloads blobs via the JMAP download endpoint.
-- IMAP attachments are **not** supported (binary MIME extraction deferred).
+Attachment fetching per provider (in `EmailProcessingUtil`, Layer 5):
+- Gmail: `GmailProviderUtil.getImageAttachments()` — walks `payload.parts`, fetches via Attachments API, base64url → base64.
+- Outlook: `OutlookProviderUtil.getImageAttachments()` — `GET .../messages/{id}/attachments?$select=...`.
+- Fastmail: `FastmailProviderUtil.downloadImageAttachments()` — JMAP `Email/get` attachments + download endpoint.
+- IMAP: **not supported**.
 
-Attachment fetching failures are non-fatal (caught per-call, warn-logged). Vision failures are non-fatal (full try/catch in `EmailSummaryOrchestrator`). Audit event `attachment_analyzed` is written after each successful vision run. Neuron usage for vision calls is tracked via `AiUsageUtil` and the `@cf/meta/llama-3.2-11b-vision-instruct` rate entry.
-
-Size and count limits: `MAX_ATTACHMENT_SIZE_BYTES` (default 2 MB) and `MAX_ATTACHMENTS_PER_EMAIL` (default 3).
+Failures are non-fatal. `attachment_analyzed` audit event written per successful run. Usage tracked via `AiUsageUtil`.
 
 ## Sender Domain Filters
 
-Each application may define optional `senderDomainFilters` with `includeRules` and `excludeRules` (each capped at 100 entries). `SenderFilterUtil` (in `packages/backend-services/src/email/`) decides whether an incoming message is processed. Empty include rules mean "process all senders except excludes"; non-empty include rules restrict processing to matching senders. Filters are stored as a provider-config row.
+Per-application `senderDomainFilters` with `includeRules` / `excludeRules` (max 100 each). `SenderFilterUtil` (`packages/backend-services/src/email/`): empty includes = process all except excludes; non-empty includes = allowlist. Stored as provider-config row.
 
 ## Provider Naming
 
@@ -253,244 +193,146 @@ Do not reintroduce password signup or user-managed refresh-token paste flows.
 
 ## Email Processing Rules
 
-Each application may define up to 20 `emailProcessingRules` (stored as a provider-config row). Rules have a condition (`operator: 'all'|'any'` plus up to 5 matchers) and a single action. The engine runs in two phases:
+Up to 20 rules per application (provider-config row). Each rule: condition (`operator: 'all'|'any'`, up to 5 matchers) + one action.
 
-- **Pre-processing** (first matching rule wins): action types `skip`, `skip_actions`, `prepend_instruction`. Evaluated before AI summarization — `skip` skips the message entirely, `skip_actions` disables AI action proposals, `prepend_instruction` injects text into the AI prompt.
-- **Post-processing** (all matching rules applied): action types `apply_label`, `archive_message`, `mark_read`, `star_message`. Evaluated after summarization using detected action types as additional context.
+- **Pre-processing** (first match wins): `skip`, `skip_actions`, `prepend_instruction` — evaluated before AI summarization.
+- **Post-processing** (all matches): `apply_label`, `archive_message`, `mark_read`, `star_message` — evaluated after summarization.
 
-`EmailRulesUtil` in `packages/backend-services/src/email/` evaluates rules. `EmailRuleSuggestionUtil` in the same package generates AI-suggested rules from a plain-language description. The rules and suggest API routes are `GET|PUT /user/application/rules` and `POST /user/application/rules/suggest`. The `RulesSection` component in `apps/web/src/components/mailboxes/` owns the rules UI.
+Matcher fields: `from`, `subject`, `body`, `has_attachment`, `detected_action_type`, `always`. Ops: `contains`, `not_contains`, `matches_sender`, `is`, `includes`, `not_includes`, `match_all`. `always` + `match_all` = unconditional match.
 
-Matcher fields: `from`, `subject`, `body`, `has_attachment`, `detected_action_type`, `always`. Ops: `contains`, `not_contains`, `matches_sender`, `is`, `includes`, `not_includes`, `match_all`. The `always` field with op `match_all` (no `value`) unconditionally matches every email.
+`EmailRulesUtil` evaluates; `EmailRuleSuggestionUtil` generates AI-suggested rules. Routes: `GET|PUT /user/application/rules`, `POST /user/application/rules/suggest`. UI: `RulesSection` in `apps/web/src/components/mailboxes/`.
 
 ## Scheduled Digest
 
-Each application can optionally configure a **daily digest** (`DigestConfig` in `packages/shared/src/model/DigestConfig.ts`): a scheduled email that aggregates pending actions and upcoming calendar events into a single formatted message. Configuration is stored as a provider-config row and managed via `GET|PUT /user/application/digest`. `POST /user/application/digest/send` triggers an immediate send.
+Optional daily digest per application (`DigestConfig` in `packages/shared/src/model/DigestConfig.ts`). Managed via `GET|PUT /user/application/digest`; `POST /user/application/digest/send` sends immediately. Configurable sections: `calendar`, `appointments`, `packages`, `flights`, `bills`, `tasks`.
 
-`ScheduledDigestTask` in `apps/background/src/scheduled/` runs in Phase 2 of the cron cycle. `DigestConfigService`, `DigestEmailUtil`, and `DigestService` in `packages/backend-services/src/digest/` own the logic. `CalendarEventSyncTask` (Phase 1) and `ActionStatusSyncTask` (Phase 1) keep synced calendar events and action statuses fresh for digest rendering. `SyncedCalendarEventDAO` and `BackgroundTaskRunDAO` in `packages/backend-data/src/dao/` store the synced events and task run records respectively.
-
-Digest sections are configurable: `calendar`, `appointments`, `packages`, `flights`, `bills`, `tasks`.
+`ScheduledDigestTask` (Phase 2). Logic in `packages/backend-services/src/digest/` (`DigestConfigService`, `DigestEmailUtil`, `DigestService`). `CalendarEventSyncTask` / `ActionStatusSyncTask` (Phase 1) keep data fresh. Storage: `SyncedCalendarEventDAO`, `BackgroundTaskRunDAO`.
 
 ## Outbound Integrations
 
-Each application may define outbound webhook integrations that receive a JSON summary payload whenever an email is processed. Integrations are stored in D1 via `ApplicationIntegrationDAO`; delivery logs are in `IntegrationDeliveryLogDAO`. `IntegrationService` in `packages/backend-services/src/integration/` dispatches payloads and records outcomes. Routes: `GET /user/application/integrations`, `POST|PUT|DELETE /user/application/integration`, `POST /user/application/integration/test`, `GET /user/application/integration/deliveries`. `IntegrationDeliveryLogPruningTask` prunes old delivery records (default retention: 30 days, `INTEGRATION_DELIVERY_LOG_RETENTION_DAYS`).
+Per-application webhook integrations receive JSON summary payloads on each processed email. Storage: `ApplicationIntegrationDAO` (D1), `IntegrationDeliveryLogDAO`. Logic: `IntegrationService` (`packages/backend-services/src/integration/`). Routes: `GET /user/application/integrations`, `POST|PUT|DELETE /user/application/integration`, `POST /user/application/integration/test`, `GET /user/application/integration/deliveries`. Retention: `INTEGRATION_DELIVERY_LOG_RETENTION_DAYS` (default 30), pruned by `IntegrationDeliveryLogPruningTask`.
 
 ## Background Task Visibility
 
-The **Processing** view (`ProcessingView` in `apps/web/src/components/views/`) exposes per-application cron task run history, synced calendar events, and processed messages. Routes:
+`ProcessingView` (`apps/web/src/components/views/`) exposes cron task run history, synced calendar events, and processed messages. Routes:
+- `GET /user/processing/task-runs` — `BackgroundTaskRunDAO`
+- `GET /user/processing/calendar-events` — `SyncedCalendarEventDAO`
+- `GET /user/processing/messages` — `ProcessedMessageDAO`
+- `POST /user/processing/run-task` — manual trigger via `ProcessingService`
 
-- `GET /user/processing/task-runs` — paginated background task run records from `BackgroundTaskRunDAO`
-- `GET /user/processing/calendar-events` — synced calendar events from `SyncedCalendarEventDAO`
-- `GET /user/processing/messages` — processed message history from `ProcessedMessageDAO`
-- `POST /user/processing/run-task` — manually trigger a specific background task now (via `ProcessingService`)
-
-Task run retention defaults to 30 days (`BACKGROUND_TASK_RUN_RETENTION_DAYS`), pruned by `BackgroundTaskRunPruningTask`.
+Retention: `BACKGROUND_TASK_RUN_RETENTION_DAYS` (default 30), pruned by `BackgroundTaskRunPruningTask`.
 
 ## Google Drive And OneDrive Ingestion
 
-Each Gmail mailbox may enable the `google_drive` OAuth2 feature and each Outlook mailbox may enable the `onedrive` feature via the existing feature toggle UI. Enabling either feature adds the required Drive scope (`drive.readonly` / `Files.Read`) and triggers a re-authorization prompt. The feature is off by default.
+Enable via feature toggle (`google_drive` for Gmail, `onedrive` for Outlook) — adds Drive scope and requires re-auth. Off by default.
 
-After re-authorization, the background cron cycle (`GoogleDriveSyncTask` / `OneDriveSyncTask` in Phase 1) polls for changed files and indexes them into the same Vectorize + D1 RAG context pipeline used for email summaries.
+Background: `GoogleDriveSyncTask` / `OneDriveSyncTask` (Phase 1) poll for changed files → Vectorize + D1 RAG pipeline.
 
-**Supported file types:**
-- Google Docs, Slides (exported as `text/plain` via Drive export API)
-- OneDrive DOCX, PPTX (converted to PDF via Graph API `?format=pdf`, then text extracted)
-- Plain text, Markdown, CSV (`.txt`, `.md`, `.csv`) via `TextDecoder`
-- PDF (best-effort Tj/TJ content stream extraction in `DriveDocumentUtil.extractTextFromPdf`)
+**Supported file types**: Google Docs/Slides (`text/plain` export), OneDrive DOCX/PPTX (PDF via Graph `?format=pdf`, then text), `.txt`/`.md`/`.csv` (`TextDecoder`), PDF (Tj/TJ extraction in `DriveDocumentUtil.extractTextFromPdf`).
 
-**Sync cursors** are stored as provider-config rows per application: `google_drive_page_token` (Google Drive Changes API start page token) and `onedrive_delta_link` (Microsoft Graph delta link). First run for Google Drive establishes the cursor and returns immediately — only files created/modified after the first sync cycle are indexed (no backfill by design).
+**Sync cursors** (provider-config rows): `google_drive_page_token`, `onedrive_delta_link`. First Google Drive run establishes cursor and returns — no backfill by design.
 
-**Source types:** `CONTEXT_SOURCE_TYPE_GOOGLE_DRIVE = 'google_drive'` and `CONTEXT_SOURCE_TYPE_ONEDRIVE = 'microsoft_onedrive'` (defined in `packages/shared/src/constants/Context.ts`).
+**Source types** (`packages/shared/src/constants/Context.ts`): `CONTEXT_SOURCE_TYPE_GOOGLE_DRIVE = 'google_drive'`, `CONTEXT_SOURCE_TYPE_ONEDRIVE = 'microsoft_onedrive'`.
 
-**Content deduplication:** `upsertDriveDocument` stores a `contentFingerprint` (HMAC of the indexed text). Files whose content fingerprint is unchanged and are already marked indexed are skipped without re-embedding, saving AI quota.
+**Deduplication**: `upsertDriveDocument` stores `contentFingerprint` (HMAC of indexed text); unchanged fingerprint = skip re-embedding.
 
-**File size limit** reuses `MAX_ATTACHMENT_SIZE_BYTES` (default 2 MB). `MAX_DRIVE_FILES_PER_SYNC` (default `20`) caps files per application per cron cycle.
-
-## Web UI Text Conventions
-
-All user-visible text in `apps/web/` must use **Title Case** (capitalize the first letter of every word). This applies to:
-
-- Button labels, headings, card titles, section headers
-- Form labels, placeholders, and input hints
-- Empty-state messages, error/success toast notifications, and confirm dialog text
-- Tooltip `title` attributes, `aria-label` values, and `<option>` text
-
-**Never hardcode ALL CAPS strings directly in JSX.** When a UI element needs to render in ALL CAPS, achieve it through CSS (`uppercase` Tailwind class / `text-transform: uppercase`), not by writing uppercase text in source. Four components already do this — write their labels/props in Title Case and the CSS handles visual rendering:
-
-| Component | File | Affected prop / children |
-|---|---|---|
-| `Metric` | `apps/web/src/components/shared/Metric.tsx` | `label` prop |
-| `SenderFilterSection` label | `apps/web/src/components/mailboxes/SenderFilterSection.tsx` | section label string |
-| `AuditLogsModal` event type span | `apps/web/src/components/modals/AuditLogsModal.tsx` | `log.eventType` (API value — no conversion needed) |
-| `ContextDocumentRow` `AuditValue` label | `apps/web/src/components/context/ContextDocumentRow.tsx` | `label` prop |
-
-**Exceptions — do not apply Title Case:**
-- Content inside `<code>` tags (e.g., `@domain.com`, technical format strings)
-- Technical URI/path placeholders (e.g., `projects/{projectId}/topics/{topicName}`)
-- Dynamic content from API responses (provider names, user-supplied data, raw event types)
-
-## Test Coverage History
-
-- Initial threshold: 90/80/90/90
-- Lowered to 55/40/70/55, then raised to 72/55/83/74, then adjusted to 57/45/68/58, then functions lowered to 66, then statements lowered to 56, then functions lowered to 65, then lines lowered to 57, then functions lowered to 64 (statements/branches/functions/lines) in vitest.config.mts as new features added surface area
-- `**/model/**` excluded from coverage (pure TypeScript types)
-- Integration tests live under `test/integration/` with their own `vitest.config.mts` (`pnpm run test:integration`). They run on `@cloudflare/vitest-pool-workers`, which does not produce V8 coverage — do not add coverage thresholds to the integration config.
-
-### Covered (test files exist)
-- Error classes: 22 tests, 100% coverage (all 9 concrete + 1 abstract)
-- Shared utils (BaseUrlUtil, VoidUtil, TimestampUtil, TimeZoneUtil): multiple tests
-- Pruning tasks (all scheduled tasks including IntegrationDeliveryLogPruningTask): 11+ tests
-- OAuth2StateUtil: 4 tests, 100% coverage
-- WebhookSecurityUtil: 9 tests, 100% coverage
-- EmailContentUtil: 17 tests, 83% lines
-- SenderFilterUtil: tests present
-- UserDAO: 3 tests, 91% lines
-- OAuth2SessionDAO: 6 tests, 100% lines
-- ProviderSubscriptionDAO: 11 tests, 93% lines
-- ProcessedMessageDAO: 2 tests, 22% lines
-- ConnectedApplicationDAO: 29 tests, ~90% lines
-- EmailActionDAO: 20 tests, ~90% lines
-- ApplicationContextDAO: 31 tests, ~80% lines
-- MiddlewareHandlers: 3 tests, 100%
-- IBaseRoute: 8 tests, ~90%
-- EmailValidationUtil: 6 tests, 65% lines
-- WorkersAiErrorUtil: 7 tests, 91% lines
-- Abstract workers: AbstractEntrypointWorker 68%, AbstractDurableObjectWorker 64%, AbstractQueueWorker 78%, AbstractWorkflowWorker 100%
-- ConfigurationManager: 80% lines
-- OAuth2AccessTokenService: 96% lines
-- EmailProcessingUtil: 57% lines
-- EmailSummaryUtil: ~70% lines
-- EmailContextUtil: 65% lines
-- EmailRulesUtil: tests present
-- EmailRuleSuggestionUtil: tests present
-- ProviderOrganizationService: tests present
-- SubscriptionRenewalUtil: 74% lines
-- AiUsageUtil: 100% lines
-- GmailProviderUtil: 30% lines (3 tests)
-- OutlookProviderUtil: 65% lines (8 tests)
-- OAuth2ProviderUtil: 65% lines (2 tests)
-- FlightTrackingService: tests present
-- PackageTrackingService: tests present
-- ActionService: tests present
-- ApplicationService: tests present
-- ApplicationResponseUtil: tests present
-- ContextService: tests present
-- FolderService: tests present
-- WatchService: tests present
-- GmailWebhookService: tests present
-- OutlookWebhookService: tests present
-- OAuth2AuthorizationService: tests present
-- Worker tests: MailOtterWorker (2), CronTasksWorker (3+), OAuth2TokenRefreshWorker (3), EmailProcessingWorkflow (3), EmailEventsQueueWorker (1)
-- Schema validation: 5 tests
-- IMAP provider utils: tests present (ImapEmailProviders.test.ts)
-- AttachmentAnalysisUtil: 9 tests, 100% statements/lines, 80% branches
-- ActionSchedulingService: 13 tests covering snoozeAction, scheduleAction, executeScheduledActions
-- GoogleDriveProviderUtil: tests present (getStartPageToken, listChanges, exportDocument, downloadFile)
-- OneDriveProviderUtil: tests present (getDelta, downloadItem, convertItemToPdf)
-- GoogleDriveIngestionService: tests present (no-op without Vectorize, first-run cursor init, index/skip/delete/fail scenarios)
-- OneDriveIngestionService: tests present (no-op without Vectorize, 401 stale-link reset, retry, happy path)
-- ChatService: 6 tests covering happy path, applicationId filtering, missing Vectorize binding (400), daily quota exceeded (400), history truncation flag, and empty Vectorize results
-
-### Still Uncovered (0% or near-0%)
-- DigestConfigService.ts, DigestEmailUtil.ts, DigestService.ts, ActionStatusSyncUtil.ts, CalendarEventSyncUtil.ts (digest services)
-- IntegrationService.ts
-- ProcessingService.ts
-- BackgroundTaskRunDAO.ts, IntegrationDeliveryLogDAO.ts, SyncedCalendarEventDAO.ts, ApplicationIntegrationDAO.ts
-- D1Utils.ts (partial)
-- IServiceError.ts (abstract class)
-- VoidUtil.ts
-
-### Mock Patterns
-- DAO tests: createMockDb() returning prepare().bind().run/first/all chain with shared vi.fn() references
-- Services using DAOs: mock DAO classes at package level, e.g., `vi.mock('@mail-otter/backend-data/dao')`
-- Services using crypto: mock at `@mail-otter/backend-data/crypto`
-- Services using workers AI: mock `env.AI.run()` via context/env object
-- Services using external APIs: mock provider client imports at package level
-- Use `vi.hoisted()` for mock variables referenced across vi.mock factories
-- `beforeEach` with `vi.clearAllMocks()` resets call counts
+File size limit reuses `MAX_ATTACHMENT_SIZE_BYTES` (2 MB). `MAX_DRIVE_FILES_PER_SYNC` (20) caps per app per cron cycle.
 
 ## Activity Feed
 
-`GET /user/activity` returns a reverse-chronological list of `ActivityEntry` items drawn from three D1 tables — no new migration required.
+`GET /user/activity` — reverse-chronological `ActivityEntry` list from three D1 tables (no migration required).
 
-**Data sources:**
-- `processed_messages` → `email_processed` events (joined to `connected_applications` to scope by `user_email`)
-- `email_summary_actions` → `action_created` events
-- `email_action_executions` JOIN `email_summary_actions` → `action_executed` events
+**Data sources**: `processed_messages` → `email_processed`; `email_summary_actions` → `action_created`; `email_action_executions` JOIN `email_summary_actions` → `action_executed`.
 
-**Query strategy:** `ActivityDAO.listForUser` runs up to three parallel queries (one per event type, skipped if that type is filtered out), merges results in JS, sorts DESC by `timestamp`, and slices to `limit`. Cursor is `CursorUtil.encode({ beforeTs })` — each query adds `AND created_at < ?` when a cursor is present.
+**Query strategy**: `ActivityDAO.listForUser` runs up to 3 parallel queries (one per type, skipped if filtered out), merges + sorts DESC by timestamp, slices to `limit`. Cursor = `CursorUtil.encode({ beforeTs })`.
 
-**Query parameters:**
-- `applicationId` — filter to a single mailbox
-- `types[]` — one or more of `email_processed`, `action_created`, `action_executed`; omit for all three
-- `cursor` — opaque cursor for next-page fetching
-- `limit` — max entries per page (default 50, max 100)
-- `format=csv` — returns a CSV file capped at 1000 entries (ignores cursor/limit)
+**Params**: `applicationId`, `types[]` (`email_processed`/`action_created`/`action_executed`), `cursor`, `limit` (default 50, max 100), `format=csv` (1000 entries, ignores cursor/limit).
 
-**CSV columns:** Event Type, Application ID, Timestamp ISO, Provider Message ID, Status / Execution Status, Error Message, Action ID, Action Type, Risk Level, Triggered By.
+**CSV columns**: Event Type, Application ID, Timestamp ISO, Provider Message ID, Status/Execution Status, Error Message, Action ID, Action Type, Risk Level, Triggered By.
 
-**Frontend:** `ActivityView` (tab between Actions and Analytics), `useActivity` hook, `activityService.ts`. The view has a mailbox selector, three event-type checkboxes, an Export CSV button, and a Refresh button. Entries show an event-type badge, description, mailbox name, and relative timestamp. Load More appends the next page via cursor.
+**Frontend**: `ActivityView`, `useActivity` hook, `activityService.ts` — mailbox selector, event-type checkboxes, Export CSV, Refresh, Load More.
 
 ## AI Email Chat
 
-`POST /user/chat` lets users ask natural-language questions about their indexed emails. It is stateless (v1 — no conversation persistence) but supports multi-turn context via a `history` array in the request body.
+`POST /user/chat` — stateless (no persistence) but multi-turn via `history` array.
 
-**Request:**
-```json
-{ "query": "What packages am I expecting?", "applicationId": "optional-app-id", "history": [] }
-```
+**Request**: `{ "query": "...", "applicationId": "optional", "history": [] }`
+**Response**: `{ "answer": "...", "sources": [{ "vectorId", "title", "sender", "applicationId", "score" }], "truncated": false }`
 
-**Response:**
-```json
-{ "answer": "...", "sources": [{ "vectorId": "...", "title": "...", "sender": "...", "applicationId": "...", "score": 0.9 }], "truncated": false }
-```
+**Backend flow** (`ChatService` in `packages/backend-services/src/chat/`):
+1. Guard: require `EMAIL_CONTEXT_INDEX`; check daily neuron quota (`AiDailyUsageDAO`).
+2. Embed query with `@cf/baai/bge-m3`; record usage.
+3. Query Vectorize using user namespace (`EmailContextUtil.getUserVectorNamespace`); filter by `applicationId` in-memory.
+4. Take top `CHAT_CONTEXT_TOP_K` matches; build system prompt from vector metadata (`title`, `sender`, `indexedText`).
+5. Call `@cf/moonshotai/kimi-k2.6` with system prompt + trimmed history + query; `thinking: false` for reasoning models.
+6. Record usage; return answer + source citations.
 
-**Backend flow (`ChatService` in `packages/backend-services/src/chat/`):**
-1. Guard: require `EMAIL_CONTEXT_INDEX` binding; check daily neuron quota via `AiDailyUsageDAO`
-2. Embed the query using `@cf/baai/bge-m3` (same model as email context indexing); record embedding usage
-3. Query `EMAIL_CONTEXT_INDEX` Vectorize using the user's namespace (via `EmailContextUtil.getUserVectorNamespace`); filter in-memory by `applicationId` if provided
-4. Take top-`CHAT_CONTEXT_TOP_K` matches; build a system prompt with numbered email excerpts from vector metadata (`title`, `sender`, `indexedText`)
-5. Call `@cf/moonshotai/kimi-k2.6` with system prompt + trimmed history + user query; apply `thinking: false` for reasoning models
-6. Record text generation usage; return answer + source citations
+No D1 migration needed. Usage tracked via `ai_daily_usage`.
 
-No D1 migration is needed. AI usage is tracked via the existing `ai_daily_usage` table.
+**Frontend**: `ChatView`, `useChat` hook, `chatService.ts` — mailbox filter, message bubbles (user right, assistant left), collapsible citations, textarea/Ask; Enter sends, Shift+Enter newline.
 
-**Frontend:** `ChatView` (tab after Activity), `useChat` hook, `chatService.ts`. The view has a mailbox filter, multi-turn message bubbles (user right-aligned, assistant left-aligned), collapsible source citations below each answer, and a textarea/Ask button at the bottom. Shift+Enter inserts a newline; Enter sends.
+## Web UI Text Conventions
+
+All user-visible text in `apps/web/` must use **Title Case**. Applies to: button labels, headings, card titles, section headers, form labels, placeholders, empty-state messages, toasts, confirm dialogs, `aria-label`, `<option>` text.
+
+**Never hardcode ALL CAPS in JSX.** Use CSS (`uppercase` Tailwind / `text-transform: uppercase`) instead. Four components render uppercase via CSS — write Title Case in source:
+
+| Component | File | Affected |
+|---|---|---|
+| `Metric` | `apps/web/src/components/shared/Metric.tsx` | `label` prop |
+| `SenderFilterSection` | `apps/web/src/components/mailboxes/SenderFilterSection.tsx` | section label |
+| `AuditLogsModal` | `apps/web/src/components/modals/AuditLogsModal.tsx` | event type span |
+| `ContextDocumentRow` | `apps/web/src/components/context/ContextDocumentRow.tsx` | `AuditValue` label |
+
+**Exceptions** (no Title Case): `<code>` content, technical URI placeholders, dynamic API response content.
+
+## Test Coverage
+
+Current thresholds (`vitest.config.mts`): **statements 56 / branches 45 / functions 64 / lines 57**. `**/model/**` excluded (pure TS types). Integration tests in `test/integration/` use `@cloudflare/vitest-pool-workers` (no V8 coverage — no thresholds there).
+
+**Covered** (test files exist): error classes (22 tests, 100%), shared utils, pruning tasks, OAuth2StateUtil, WebhookSecurityUtil, EmailContentUtil, SenderFilterUtil, UserDAO, OAuth2SessionDAO, ProviderSubscriptionDAO, ProcessedMessageDAO, ConnectedApplicationDAO, EmailActionDAO, ApplicationContextDAO, MiddlewareHandlers, IBaseRoute, EmailValidationUtil, WorkersAiErrorUtil, abstract workers, ConfigurationManager, OAuth2AccessTokenService, EmailProcessingUtil, EmailSummaryUtil, EmailContextUtil, EmailRulesUtil, EmailRuleSuggestionUtil, ProviderOrganizationService, SubscriptionRenewalUtil, AiUsageUtil, GmailProviderUtil, OutlookProviderUtil, OAuth2ProviderUtil, FlightTrackingService, PackageTrackingService, ActionService, ApplicationService, ApplicationResponseUtil, ContextService, FolderService, WatchService, GmailWebhookService, OutlookWebhookService, OAuth2AuthorizationService, Worker tests (MailOtterWorker, CronTasksWorker, OAuth2TokenRefreshWorker, EmailProcessingWorkflow, EmailEventsQueueWorker), schema validation, IMAP provider utils, AttachmentAnalysisUtil, ActionSchedulingService, GoogleDriveProviderUtil, OneDriveProviderUtil, GoogleDriveIngestionService, OneDriveIngestionService, ChatService (6 tests).
+
+**Still uncovered** (0% or near-0%): `DigestConfigService`, `DigestEmailUtil`, `DigestService`, `ActionStatusSyncUtil`, `CalendarEventSyncUtil`, `IntegrationService`, `ProcessingService`, `BackgroundTaskRunDAO`, `IntegrationDeliveryLogDAO`, `SyncedCalendarEventDAO`, `ApplicationIntegrationDAO`, `D1Utils` (partial), `IServiceError`, `VoidUtil`.
+
+**Mock patterns**:
+- DAO tests: `createMockDb()` returning `prepare().bind().run/first/all` chain with shared `vi.fn()` refs.
+- Services with DAOs: `vi.mock('@mail-otter/backend-data/dao')`.
+- Crypto: `vi.mock('@mail-otter/backend-data/crypto')`.
+- Workers AI: mock `env.AI.run()`.
+- External APIs: mock provider client imports at package level.
+- Use `vi.hoisted()` for mocks referenced across `vi.mock` factories.
+- `beforeEach` + `vi.clearAllMocks()` resets call counts.
 
 ## Keeping AGENTS.md Current
 
-Always update `AGENTS.md` as part of any change that adds, removes, or renames:
-- Routes (update the route lists in Auth And Routing)
-- DAO classes, services, or background tasks (update Architecture)
-- Cron task phases (update the CronTasksWorker bullet in Architecture)
-- Environment variables (update the reference in Build And Runtime Notes, and the README table)
-- Providers (update Provider Naming)
-- Test files (update Test Coverage History)
-- Top-level features (update the Overview paragraph and add or update a feature section)
-
-Treat `AGENTS.md` as living documentation. Do not leave it stale after a feature lands.
+Update `AGENTS.md` (and by extension `CLAUDE.md`, which is a symlink to it) as part of any change that adds, removes, or renames:
+- Routes → Auth And Routing
+- DAOs, services, background tasks → Architecture
+- Cron task phases → CronTasksWorker bullet
+- Env vars → Build And Runtime Notes env var table
+- Providers → Provider Naming
+- Test files → Test Coverage
+- Top-level features → Overview + new feature section
 
 ## Commit Policy
 
-Always commit changes after completing work unless the user explicitly says not to. Do not wait to be asked.
+Always commit changes after completing work unless explicitly told not to.
 
 ## Git Commit Messages
 
-- Use Conventional Commits with this subject format: `<TYPE>[optional scope]: <description>`.
-- Write the type in uppercase, for example `FIX`, `FEAT`, `DOCS`, `STYLE`, `REFACTOR`, `TEST`, `BUILD`, `CHORE`, `CI`, or `PERF`.
-- Write the optional scope in lowercase inside parentheses, for example `FEAT(runtime): Add Scheduled Job State`.
-- Write the description as concise human-readable words with spaces, capitalizing the first letter of each word, for example `DOCS: Latest Agents Context Reflection`, `STYLE: Standardize Python Formatting`, or `FEAT: Bootstrap JQAnywhere v0.1 Framework`.
-- When creating a commit from `main`, first switch to a new branch generated from the planned commit subject.
-- Use lowercase slash-separated branch names: `type/description` when there is no scope, or `type/scope/description` when there is a scope.
-- Convert the description to kebab-case for the branch, for example `docs/latest-agents-context-reflection`, `docs/agents/document-commit-standard`, or `feat/bootstrap/bootstrap-jqanywhere-v0.1-framework`.
-- Always include a Markdown commit body description for every new commit, separated from the subject by a blank line.
-- Use optional footers after the body, separated by a blank line, following git trailer-style formatting.
-- Use `FIX` for bug patches and `FEAT` for new features; other conventional types are allowed when they better communicate intent.
-- Mark breaking API changes with `!` after the type or scope, or with a `BREAKING CHANGE: <description>` footer.
+Format: `<TYPE>[optional scope]: <description>`
+
+- Type in UPPERCASE: `FIX`, `FEAT`, `DOCS`, `STYLE`, `REFACTOR`, `TEST`, `BUILD`, `CHORE`, `CI`, `PERF`.
+- Scope in lowercase: `FEAT(runtime): Add Scheduled Job State`.
+- Description: Title Case words — `DOCS: Latest Agents Context Reflection`.
+- When committing from `main`, first create a branch: `type/description` or `type/scope/description` in kebab-case (e.g. `feat/bootstrap/bootstrap-jqanywhere-v0.1-framework`).
+- Always include a Markdown body separated from the subject by a blank line.
+- Breaking changes: `!` after type/scope, or `BREAKING CHANGE: <description>` footer.
 
 ```text
 <TYPE>[optional scope]: <description>
 
-[optional body in Markdown]
+[Markdown body]
 
-[optional footer(s)]
+[optional footers]
 ```
